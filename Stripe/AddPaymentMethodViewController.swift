@@ -12,20 +12,31 @@ import UIKit
 
 protocol AddPaymentMethodViewControllerDelegate: AnyObject {
     func didUpdate(_ viewController: AddPaymentMethodViewController)
+    func shouldOfferLinkSignup(_ viewController: AddPaymentMethodViewController) -> Bool
 }
 
 /// This displays:
 /// - A carousel of Payment Method types
 /// - Input fields for the selected Payment Method type
+/// For internal SDK use only
+@objc(STP_Internal_AddPaymentMethodViewController)
 class AddPaymentMethodViewController: UIViewController {
     // MARK: - Read-only Properties
     weak var delegate: AddPaymentMethodViewControllerDelegate?
     lazy var paymentMethodTypes: [STPPaymentMethodType] = {
-        return intent.recommendedPaymentMethodTypes.filter {
+        var recommendedPaymentMethodTypes = intent.recommendedPaymentMethodTypes
+        if configuration.linkPaymentMethodsOnly {
+            // If we're in the Link modal, manually add instant debit
+            // as an option and let the support calls decide if it's allowed
+            recommendedPaymentMethodTypes.append(.linkInstantDebit)
+        }
+        return recommendedPaymentMethodTypes.filter {
             PaymentSheet.supportsAdding(
                 paymentMethod: $0,
                 configuration: configuration,
-                intent: intent
+                intent: intent,
+                supportedPaymentMethods: configuration.linkPaymentMethodsOnly ?
+                    PaymentSheet.supportedLinkPaymentMethods : PaymentSheet.supportedPaymentMethods
             )
         }
     }()
@@ -33,12 +44,22 @@ class AddPaymentMethodViewController: UIViewController {
         return paymentMethodTypesView.selected
     }
     var paymentOption: PaymentOption? {
+        if let linkEnabledElement = paymentMethodFormElement as? LinkEnabledPaymentMethodElement {
+            return linkEnabledElement.makePaymentOption()
+        }
+
         if let params = paymentMethodFormElement.updateParams(
             params: IntentConfirmParams(type: selectedPaymentMethodType)
         ) {
             return .new(confirmParams: params)
         }
         return nil
+    }
+
+    var linkAccount: PaymentSheetLinkAccount? {
+        didSet {
+            updateFormElement()
+        }
     }
 
     private let intent: Intent
@@ -53,11 +74,12 @@ class AddPaymentMethodViewController: UIViewController {
     }()
     private lazy var paymentMethodTypesView: PaymentMethodTypeCollectionView = {
         let view = PaymentMethodTypeCollectionView(
-            paymentMethodTypes: paymentMethodTypes, delegate: self)
+            paymentMethodTypes: paymentMethodTypes, appearance: configuration.appearance, delegate: self)
         return view
     }()
     private lazy var paymentMethodDetailsContainerView: DynamicHeightContainerView = {
-        let view = DynamicHeightContainerView()
+        // when displaying link, we aren't in the bottom/payment sheet so pin to top for height changes
+        let view = DynamicHeightContainerView(pinnedDirection: configuration.linkPaymentMethodsOnly ? .top : .bottom)
         view.directionalLayoutMargins = PaymentSheetUI.defaultMargins
         view.addPinnedSubview(paymentMethodDetailsView)
         view.updateHeight()
@@ -72,12 +94,15 @@ class AddPaymentMethodViewController: UIViewController {
     required init(
         intent: Intent,
         configuration: PaymentSheet.Configuration,
-        delegate: AddPaymentMethodViewControllerDelegate
+        delegate: AddPaymentMethodViewControllerDelegate,
+        linkAccount: PaymentSheetLinkAccount? = nil
     ) {
         self.configuration = configuration
         self.intent = intent
         self.delegate = delegate
+        self.linkAccount = linkAccount
         super.init(nibName: nil, bundle: nil)
+        self.view.backgroundColor = configuration.appearance.color.background
     }
 
     // MARK: - UIViewController
@@ -151,27 +176,36 @@ class AddPaymentMethodViewController: UIViewController {
     }
 
     private func makeElement(for type: STPPaymentMethodType) -> PaymentMethodElement {
+        let offerSaveToLinkWhenSupported = delegate?.shouldOfferLinkSignup(self) ?? false
+
         let formElement = PaymentSheetFormFactory(
             intent: intent,
             configuration: configuration,
-            paymentMethod: type
+            paymentMethod: type,
+            offerSaveToLinkWhenSupported: offerSaveToLinkWhenSupported,
+            linkAccount: linkAccount
         ).make()
         formElement.delegate = self
         return formElement
     }
+
+    private func updateFormElement() {
+        paymentMethodFormElement = makeElement(for: selectedPaymentMethodType)
+        updateUI()
+    }
+
 }
 
 // MARK: - PaymentMethodTypeCollectionViewDelegate
 
 extension AddPaymentMethodViewController: PaymentMethodTypeCollectionViewDelegate {
     func didUpdateSelection(_ paymentMethodTypeCollectionView: PaymentMethodTypeCollectionView) {
-        paymentMethodFormElement = makeElement(for: paymentMethodTypeCollectionView.selected)
-        updateUI()
+        updateFormElement()
         delegate?.didUpdate(self)
     }
 }
 
-// MARK: - AddPaymentMethodViewDelegate
+// MARK: - ElementDelegate
 
 extension AddPaymentMethodViewController: ElementDelegate {
     func didFinishEditing(element: Element) {

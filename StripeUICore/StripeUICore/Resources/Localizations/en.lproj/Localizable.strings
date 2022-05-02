@@ -14,8 +14,20 @@ Section header for address fields */
 /* Label of an address field */
 "Area" = "Area";
 
+/* Caption for AU BECS account number */
+"AU BECS account number" = "AU BECS account number";
+
+/* Placeholder for AU BECS BSB number */
+"BSB number" = "BSB number";
+
+/* Button title to cancel action in an alert */
+"Cancel" = "Cancel";
+
 /* Caption for City field on address form */
 "City" = "City";
+
+/* Text for continue button */
+"Continue" = "Continue";
 
 /* Caption for Country field on address form */
 "Country" = "Country";
@@ -51,20 +63,41 @@ Label of an address field */
 /* Label for first (given) name field */
 "First" = "First";
 
+/* Error description for incomplete BSB number */
+"Incomplete BSB number" = "Incomplete BSB number";
+
+/* Error description for incomplete phone number */
+"Incomplete phone number" = "Incomplete phone number";
+
 /* Label of an address field */
 "Island" = "Island";
 
 /* Label for last (family) name field */
 "Last" = "Last";
 
+/* Form field header for entering a mobile phone number */
+"Mobile number" = "Mobile number";
+
 /* Label for Name field on form */
 "Name" = "Name";
+
+/* Label for Name on account field on form */
+"Name on account" = "Name on account";
 
 /* Label of an address field */
 "Oblast" = "Oblast";
 
+/* ok button */
+"OK" = "OK";
+
+/* An option in a dropdown selector indicating the customer's desired selection is not in the list. e.g., 'Choose your bank: Bank1, Bank2, Other' */
+"Other" = "Other";
+
 /* Label of an address field */
 "Parish" = "Parish";
+
+/* Caption for Phone field on address form */
+"Phone" = "Phone";
 
 /* Label of an address field
 Short string for postal code (text used in non-US countries) */
@@ -87,11 +120,17 @@ Label of an address field */
 /* Label of an address field */
 "Suburb or city" = "Suburb or city";
 
+/* Error description for incomplete account number */
+"The account number you entered is incomplete." = "The account number you entered is incomplete.";
+
 /* An error message. */
 "The ID number you entered is incomplete." = "The ID number you entered is incomplete.";
 
 /* Label of an address field */
 "Town or city" = "Town or city";
+
+/* Error string when we can't parse a phone number */
+"Unable to parse phone number" = "Unable to parse phone number";
 
 /* Error message when email is invalid */
 "Your email is invalid." = "Your email is invalid.";

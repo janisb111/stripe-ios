@@ -3,7 +3,6 @@
 
 version: 2.1
 orbs:
-  slack: circleci/slack@4.1
   macos: circleci/macos@2.0.0
 commands:
   prep_all:
@@ -13,17 +12,17 @@ commands:
       - prep_environment
       - prep_clone
       - prep_bundler_carthage
-  prep_installtests_122:
-    description: "Preps the build environment for Xcode 12.2"
+  prep_installtests_132:
+    description: "Preps the build environment for Xcode 13.2"
     steps:
       - run: "brew upgrade carthage"
       - run: git clone --depth 1 "$CIRCLE_REPOSITORY_URL" --branch "$CIRCLE_BRANCH" .
       - run: "bundle config set path 'vendor/bundle'"
       - restore_cache:
-          key: v9-stp-bundle-xcode-122-cache # Update this if bundle dependencies or Xcode version change
+          key: v12-stp-bundle-xcode-132-cache # Update this if bundle dependencies or Xcode version change
       - run: "bundle install"
       - save_cache:
-          key: v9-stp-bundle-xcode-122-cache
+          key: v12-stp-bundle-xcode-132-cache
           paths:
             - vendor
   prep_clone:
@@ -35,17 +34,17 @@ commands:
     steps:
       - run: "bundle config set path 'vendor/bundle'"
       - restore_cache:
-          key: v9-stp-carthage-xcode-1251-cache # Update this if Carthage dependencies or Xcode version change
+          key: v12-stp-carthage-xcode-133-cache # Update this if Carthage dependencies or Xcode version change
       - restore_cache:
-          key: v9-stp-bundle-xcode-1251-cache # Update this if bundle dependencies or Xcode version change
+          key: v12-stp-bundle-xcode-133-cache # Update this if bundle dependencies or Xcode version change
       - run: "bundle install"
       - run: "carthage bootstrap --platform iOS --configuration Release --no-use-binaries --cache-builds --use-xcframeworks"
       - save_cache:
-          key: v9-stp-carthage-xcode-1251-cache
+          key: v12-stp-carthage-xcode-133-cache
           paths:
             - Carthage
       - save_cache:
-          key: v9-stp-bundle-xcode-1251-cache
+          key: v12-stp-bundle-xcode-133-cache
           paths:
             - vendor
   prep_environment:
@@ -58,7 +57,7 @@ commands:
     description: "Prep simulators"
     steps:
       - macos/preboot-simulator:
-          version: "13.7"
+          version: "15.4"
           platform: "iOS"
           device: "iPhone 8"
   archive_logs:
@@ -75,15 +74,20 @@ commands:
 executors:
   mac-executor:
     macos:
-      xcode: 12.5.1
+      xcode: 13.3.0
     resource_class: macos.x86.medium.gen2
-  xcode-122-mac-executor:
+  xcode-132-mac-executor:
     macos:
-      xcode: 12.2.0
+      xcode: 13.2.1
+    resource_class: macos.x86.medium.gen2
+  xcode-125-mac-executor:
+    macos:
+      xcode: 12.5.0
+    resource_class: macos.x86.medium.gen2
 
 jobs:
   size-report:
-    executor: mac-executor
+    executor: xcode-125-mac-executor
 
     steps:
       - macos/switch-ruby:
@@ -107,7 +111,9 @@ jobs:
           stripecameracore_tests \
           stripecore_tests \
           stripeidentity_tests \
+          stripeconnections_tests \
           stripecardscan_tests \
+          stripeapplepay_tests \
           stripeuicore_tests \
           ui_tests \
           installation_cocoapods_without_frameworks_objc \
@@ -117,12 +123,22 @@ jobs:
           installation_spm_swift \
           installation_carthage \
           paymentsheet_tests \
+          legacy_tests_14 \
           preflight \
           ci_builds \
           export_builds \
           analyze \
           threeds2_tests \
-          check_docs
+          check_docs \
+          objc_symbol_check
+      - archive_logs
+
+  stripeconnections-tests:
+    executor: mac-executor
+
+    steps:
+      - prep_all
+      - run: "bundle exec fastlane stripeconnections_tests"
       - archive_logs
 
   e2e-only:
@@ -141,12 +157,12 @@ jobs:
           command: "./ci_scripts/notify.rb fail"
           when: on_fail
 
-  xcode-122-install-tests:
-    executor: xcode-122-mac-executor
+  xcode-132-install-tests:
+    executor: xcode-132-mac-executor
     parallelism: 3
 
     steps:
-      - prep_installtests_122
+      - prep_installtests_132
       - run: |
           bundle exec ./ci_scripts/circle_parallelize.rb \
           export_builds \
@@ -158,6 +174,22 @@ jobs:
           installation_carthage
       - archive_logs
 
+  deploy-dry-run:
+    executor: xcode-132-mac-executor
+
+    steps:
+      - run: git clone "$CIRCLE_REPOSITORY_URL" --branch "$CIRCLE_BRANCH" .
+      - run: "sudo gem install bundler"
+      - run: "bundle install"
+      - run: "brew install sourcekitten"
+      - run: "bundle exec ./ci_scripts/create_release.rb --version 99.99.99 --dry-run"
+      - run: "bundle exec ./ci_scripts/deploy_release.rb --dry-run"
+      - archive_logs
+      - run:
+          name: Notify on failure
+          command: "./ci_scripts/notify_ci.rb"
+          when: on_fail
+
   basic-integration-tests:
     executor: mac-executor
 
@@ -165,9 +197,10 @@ jobs:
       - prep_all
       - run: "bundle exec fastlane basic_integration_tests"
       - archive_logs
-      - slack/notify:
-          event: fail
-          template: basic_fail_1
+      - run:
+          name: Notify on failure
+          command: "./ci_scripts/notify_ci.rb"
+          when: on_fail
 
   paymentsheet-tests:
     executor: mac-executor
@@ -184,9 +217,10 @@ jobs:
       - prep_all
       - run: "bundle exec fastlane integration_all"
       - archive_logs
-      - slack/notify:
-          event: fail
-          template: basic_fail_1
+      - run:
+          name: Notify on failure
+          command: "./ci_scripts/notify_ci.rb"
+          when: on_fail
 
   linting-tests:
     executor: mac-executor
@@ -207,26 +241,32 @@ jobs:
       - prep_bundler_carthage
       - run: "bundle exec fastlane check_docs"
 
-  test-legacy-11:
+  legacy-tests-12:
     executor: mac-executor
 
     steps:
       - prep_environment
       - prep_clone
       - prep_bundler_carthage
-      - run: sudo bundle exec xcversion simulators --install="iOS 11.4" --no-progress || true
-      - run: "bundle exec fastlane legacy_tests_11"
+      - run:
+          name: "Install old simulator"
+          no_output_timeout: 20m
+          command: sudo bundle exec xcversion simulators --install="iOS 12.4" --no-progress || true
+      - run: "bundle exec fastlane legacy_tests_12"
       - archive_logs
 
-  test-legacy-12:
+  legacy-tests-13:
     executor: mac-executor
 
     steps:
       - prep_environment
       - prep_clone
       - prep_bundler_carthage
-      - run: sudo bundle exec xcversion simulators --install="iOS 12.4" --no-progress || true
-      - run: "bundle exec fastlane legacy_tests_12"
+      - run:
+          name: "Install old simulator"
+          no_output_timeout: 20m
+          command: sudo bundle exec xcversion simulators --install="iOS 13.7" --no-progress || true
+      - run: "bundle exec fastlane legacy_tests_13"
       - archive_logs
 
 workflows:
@@ -235,9 +275,9 @@ workflows:
     jobs:
       - size-report
       - main-tests
-      - test-legacy-11
-      - test-legacy-12
-      - xcode-122-install-tests
+      - legacy-tests-12
+      - legacy-tests-13
+      - xcode-132-install-tests
   e2e-only:
     triggers:
       - schedule:
@@ -261,7 +301,10 @@ workflows:
     jobs:
       - integration-all:
           context:
-            - Slack
+            - E2EEndpoint
       - basic-integration-tests:
           context:
-            - Slack
+            - E2EEndpoint
+      - deploy-dry-run:
+          context:
+            - E2EEndpoint

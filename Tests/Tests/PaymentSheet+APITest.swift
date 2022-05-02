@@ -16,6 +16,14 @@ class PaymentSheetAPITest: XCTestCase {
         config.apiClient = STPAPIClient(publishableKey: STPTestingDefaultPublishableKey)
         return config
     }()
+
+    override class func setUp() {
+        super.setUp()
+        // `PaymentSheet.load()` uses the `LinkAccountService` to lookup the Link user account.
+        // Override the default cookie store since Keychain is not available in this test case.
+        LinkAccountService.defaultCookieStore = LinkInMemoryCookieStore()
+    }
+
     func fetchPaymentIntent(types: [String], completion: @escaping (Result<(String), Error>) -> Void) {
         STPTestingAPIClient
             .shared()
@@ -70,10 +78,10 @@ class PaymentSheetAPITest: XCTestCase {
                     configuration: self.configuration
                 ) { result in
                     switch result {
-                    case .success((let paymentIntent, let paymentMethods)):
-                        expectation.fulfill()
+                    case .success((let paymentIntent, let paymentMethods, _)):
                         XCTAssertEqual(paymentIntent.recommendedPaymentMethodTypes, expected)
                         XCTAssertEqual(paymentMethods, [])
+                        expectation.fulfill()
                     case .failure(let error):
                         print(error)
                     }
@@ -89,7 +97,7 @@ class PaymentSheetAPITest: XCTestCase {
     func testPaymentSheetLoadWithSetupIntent() {
         let expectation = XCTestExpectation(description: "Retrieve Setup Intent With Preferences")
         let types = ["ideal", "card", "bancontact", "sofort"]
-        let expected: [STPPaymentMethodType] = [.card]
+        let expected: [STPPaymentMethodType] = [.card, .iDEAL, .bancontact, .sofort]
         fetchSetupIntent(types: types) { result in
             switch result {
             case .success(let clientSecret):
@@ -98,10 +106,10 @@ class PaymentSheetAPITest: XCTestCase {
                     configuration: self.configuration
                 ) { result in
                     switch result {
-                    case .success((let setupIntent, let paymentMethods)):
-                        expectation.fulfill()
+                    case .success((let setupIntent, let paymentMethods, _)):
                         XCTAssertEqual(setupIntent.recommendedPaymentMethodTypes, expected)
                         XCTAssertEqual(paymentMethods, [])
+                        expectation.fulfill()
                     case .failure(let error):
                         print(error)
                     }

@@ -7,33 +7,25 @@
 
 import UIKit
 @_spi(STP) import StripeCore
+@_spi(STP) import StripeUICore
+
+enum DocumentTypeSelectViewControllerError: AnalyticLoggableError {
+    case noValidDocumentTypes(providedDocumentTypes: [String])
+
+    func serializeForLogging() -> [String : Any] {
+        // TODO(mludowise|IDPROD-2816): Log error
+        return [:]
+    }
+}
 
 final class DocumentTypeSelectViewController: IdentityFlowViewController {
 
-    typealias DocumentType = VerificationPageDataIDDocument.DocumentType
+    // MARK: DocumentType
 
     struct DocumentTypeAndLabel: Equatable {
         let documentType: DocumentType
         let label: String
     }
-
-    // TODO(mludowise|IDPROD-2782): Use a view that matches design instead of a stackView with basic buttons
-    private lazy var stackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .vertical
-        stackView.spacing = 8
-
-        documentTypeWithLabels.forEach { documentTypeAndLabel in
-            let button = ButtonWithTapHandler(onTap: { [weak self] in
-                self?.didTapButton(documentType: documentTypeAndLabel.documentType)
-            })
-            button.setTitle(documentTypeAndLabel.label, for: .normal)
-            button.setTitleColor(.systemBlue, for: .normal)
-            stackView.addArrangedSubview(button)
-        }
-
-        return stackView
-    }()
 
     var documentTypeWithLabels: [DocumentTypeAndLabel] {
         /*
@@ -43,95 +35,143 @@ final class DocumentTypeSelectViewController: IdentityFlowViewController {
          The results should be:
          - Sorted by display order
          - Filtered such that document types recognized by the client are represented
-
-         If there are no document types recognized by the client, default to
-         displaying all document types as valid options.
          */
 
-        let fromServer: [DocumentTypeAndLabel] = DocumentType.allCases.compactMap {
+        return DocumentType.allCases.compactMap {
             guard let label = staticContent.idDocumentTypeAllowlist[$0.rawValue] else {
                 return nil
             }
             return DocumentTypeAndLabel(documentType: $0, label: label)
         }
-        guard fromServer.isEmpty else {
-            return fromServer
+    }
+
+    // MARK: UI
+
+    private let instructionListView = InstructionListView()
+
+    var viewModel: InstructionListView.ViewModel {
+        guard documentTypeWithLabels.count != 1 else {
+            return .init(
+                instructionText: staticContent.body,
+                listViewModel: nil
+            )
         }
 
-        // If no valid `DocumentType` was returned by the server, then default to all types
-        return DocumentType.allCases.map {
-            DocumentTypeAndLabel(documentType: $0, label: $0.defaultLabel)
+        let items: [ListItemView.ViewModel] = documentTypeWithLabels.map { documentTypeAndLabel in
+            // Don't make the row tappable if we're actively saving the document
+            var tapHandler: (() -> Void)?
+            if currentlySavingSelectedDocument == nil {
+                tapHandler = { [weak self] in
+                    self?.didTapOption(documentType: documentTypeAndLabel.documentType)
+                }
+            }
+
+            // Display loading indicator if we're currently saving
+            var accessoryViewModel: ListItemView.ViewModel.Accessory? = nil
+            if currentlySavingSelectedDocument == documentTypeAndLabel.documentType {
+                accessoryViewModel = .activityIndicator
+            }
+
+            return ListItemView.ViewModel(
+                text: documentTypeAndLabel.label,
+                accessibilityLabel: nil,
+                accessory: accessoryViewModel,
+                onTap: tapHandler
+            )
+        }
+        return .init(instructionText: nil, listViewModel: .init(items: items))
+    }
+
+    var buttonViewModel: IdentityFlowView.ViewModel.Button? {
+        guard documentTypeWithLabels.count == 1 else {
+            return nil
+        }
+
+        return .continueButton(
+            state: (currentlySavingSelectedDocument != nil) ? .loading : .enabled,
+            didTap: { [weak self] in
+                guard let self = self else { return }
+                self.didTapOption(documentType: self.documentTypeWithLabels[0].documentType)
+            }
+        )
+
+    }
+
+    // Gets set to user-selected document type.
+    // After selection is saved, is reset to nil.
+    private(set) var currentlySavingSelectedDocument: DocumentType? = nil {
+        didSet {
+            guard oldValue != currentlySavingSelectedDocument else {
+                return
+            }
+            updateUI()
         }
     }
+
+    // MARK: - Configuration
 
     let staticContent: VerificationPageStaticContentDocumentSelectPage
 
     init(sheetController: VerificationSheetControllerProtocol,
-         staticContent: VerificationPageStaticContentDocumentSelectPage) {
+         staticContent: VerificationPageStaticContentDocumentSelectPage) throws {
 
         self.staticContent = staticContent
         super.init(sheetController: sheetController)
 
-        // TODO(mludowise|IDPROD-2782): Update & localize text when design is finalized
+        guard !documentTypeWithLabels.isEmpty else {
+            throw DocumentTypeSelectViewControllerError.noValidDocumentTypes(
+                providedDocumentTypes: Array(staticContent.idDocumentTypeAllowlist.keys)
+            )
+        }
+
+        updateUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func updateUI() {
+        instructionListView.configure(with: viewModel)
         configure(
-            title: staticContent.title,
-            backButtonTitle: "Select ID",
+            backButtonTitle: STPLocalizedString(
+                "ID Type",
+                "Back button title to go back to screen to select form of identification (driver's license, passport, etc) to verify someone's identity"
+            ),
             viewModel: .init(
-                contentView: stackView,
-                buttons: []
+                headerViewModel: .init(
+                    backgroundColor: CompatibleColor.systemBackground,
+                    headerType: .plain,
+                    titleText: staticContent.title
+                ),
+                contentViewModel: .init(
+                    view: instructionListView,
+                    inset: .init(top: 32, leading: 0, bottom: 0, trailing: 0)
+                ),
+                buttons: buttonViewModel.map { [$0] } ?? []
             )
         )
     }
 
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-}
+    func didTapOption(documentType: DocumentType) {
+        // Disable tap and show activity indicator while we're saving
+        currentlySavingSelectedDocument = documentType
 
-
-extension DocumentTypeSelectViewController {
-    func didTapButton(documentType: DocumentType) {
-        sheetController?.dataStore.idDocumentType = documentType
-        sheetController?.saveData { [weak sheetController] apiContent in
-            guard let sheetController = sheetController else { return }
-            sheetController.flowController.transitionToNextScreen(
-                apiContent: apiContent,
-                sheetController: sheetController
-            )
+        sheetController?.saveAndTransition(collectedData: .init(
+            idDocumentType: documentType
+        )) { [weak self] in
+                // Re-enable tap & stop activity indicator so the user can
+                // make a different selection if they come back to this
+                // screen after hitting the back button.
+                self?.currentlySavingSelectedDocument = nil
         }
     }
 }
 
-// TODO(mludowise|IDPROD-2782): This is a temporary helper class to add button tap actions and should be replaced with a reusable component that matches the design
-private class ButtonWithTapHandler: UIButton {
-    let tapHandler: () -> Void
+// MARK: - IdentityDataCollecting
 
-    init(onTap: @escaping () -> Void) {
-        self.tapHandler = onTap
-        super.init(frame: .zero)
-
-        addTarget(self, action: #selector(didTap), for: .touchUpInside)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    @objc private func didTap() {
-        tapHandler()
-    }
-}
-
-extension DocumentTypeSelectViewController.DocumentType {
-    // Label to display for each document type if the server doesn't return one
-    var defaultLabel: String {
-        switch self {
-        case .passport:
-            return String.Localized.passport
-        case .drivingLicense:
-            return String.Localized.driving_license
-        case .idCard:
-            return String.Localized.id_card
-        }
+extension DocumentTypeSelectViewController: IdentityDataCollecting {
+    var collectedFields: Set<VerificationPageFieldType> {
+        return [.idDocumentType]
     }
 }

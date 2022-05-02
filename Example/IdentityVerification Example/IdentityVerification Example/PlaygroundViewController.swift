@@ -5,15 +5,8 @@
 //  Created by Mel Ludowise on 3/3/21.
 //
 
-// Note: Do not import Stripe using `@_spi(STP)` in production.
-// This exposes internal functionality which may cause unexpected behavior if used directly.
-@_spi(STP) import StripeIdentity
+import StripeIdentity
 import UIKit
-
-private let nativeUIVerificationPageDataMockURL = Bundle(for: PlaygroundViewController.self).url(forResource: "VerificationPageData_200", withExtension: "json")
-
-private let nativeUIFrontDocumentPhotoMockURL = Bundle.main.url(forResource: "front_drivers_license", withExtension: "jpg")
-private let nativeUIBackDocumentPhotoMockURL = Bundle.main.url(forResource: "back_drivers_license", withExtension: "jpg")
 
 class PlaygroundViewController: UIViewController {
 
@@ -32,9 +25,6 @@ class PlaygroundViewController: UIViewController {
     @IBOutlet weak var useNativeComponentsSwitch: UISwitch!
     @IBOutlet weak var documentOptionsContainerView: UIStackView!
     @IBOutlet weak var nativeComponentsOptionsContainerView: UIStackView!
-
-    @IBOutlet weak var nativeComponentErrorMockLabel: UILabel!
-    @IBOutlet weak var nativeComponentErrorMockStepper: UIStepper!
 
     @IBOutlet weak var verifyButton: UIButton!
     @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
@@ -79,6 +69,16 @@ class PlaygroundViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        if #available(iOS 14.3, *) {
+            useNativeComponentsSwitch.isEnabled = true
+        } else {
+            useNativeComponentsSwitch.isEnabled = false
+            useNativeComponentsSwitch.isOn = true
+            nativeComponentsOptionsContainerView.isHidden = false
+        }
+
+        mockDocumentCameraForSimulator()
+
         activityIndicator.hidesWhenStopped = true
         verifyButton.addTarget(self, action: #selector(didTapVerifyButton), for: .touchUpInside)
     }
@@ -86,11 +86,6 @@ class PlaygroundViewController: UIViewController {
     @objc
     func didTapVerifyButton() {
         requestVerificationSession()
-    }
-
-    @objc
-    func didReceiveRedirectFromVerificationNotification() {
-        displayAlert("Finished verification in browser!")
     }
 
     func requestVerificationSession() {
@@ -148,22 +143,25 @@ class PlaygroundViewController: UIViewController {
     func startVerificationFlow(responseJson: [String: String]) {
         let shouldUseNativeComponents = useNativeComponentsSwitch.isOn
 
-        if shouldUseNativeComponents {
-            setupVerificationSheetNativeUI(responseJson: responseJson)
-        } else {
+        if !shouldUseNativeComponents,
+           #available(iOS 14.3, *) {
             setupVerificationSheetWebUI(responseJson: responseJson)
+        } else {
+            setupVerificationSheetNativeUI(responseJson: responseJson)
         }
+
+        let verificationSessionId = responseJson["id"]
 
         self.verificationSheet?.present(
             from: self,
             completion: { [weak self] result in
                 switch result {
                 case .flowCompleted:
-                    self?.displayAlert("Completed!")
+                    self?.displayAlert("Completed!", verificationSessionId)
                 case .flowCanceled:
-                    self?.displayAlert("Canceled!")
+                    self?.displayAlert("Canceled!", verificationSessionId)
                 case .flowFailed(let error):
-                    self?.displayAlert("Failed!")
+                    self?.displayAlert("Failed!", verificationSessionId)
                     print(error)
                 }
             })
@@ -180,26 +178,14 @@ class PlaygroundViewController: UIViewController {
         }
         self.verificationSheet = IdentityVerificationSheet(
             verificationSessionId: verificationSessionId,
-            ephemeralKeySecret: ephemeralKeySecret
+            ephemeralKeySecret: ephemeralKeySecret,
+            configuration: IdentityVerificationSheet.Configuration(
+                brandLogo: UIImage(named: "BrandLogo")!
+            )
         )
-        StripeAPI.defaultPublishableKey = responseJson["publishable_key"]
-
-        // Enable experimental native UI
-        if let nativeUIVerificationPageDataMockURL = nativeUIVerificationPageDataMockURL {
-            self.verificationSheet?.mockNativeUIAPIResponse(
-                verificationPageDataFileURL: nativeUIVerificationPageDataMockURL,
-                displayErrorOnScreen: (nativeComponentErrorMockStepper.value >= 0) ? Int(nativeComponentErrorMockStepper.value) : nil
-            )
-        }
-        if let frontURL = nativeUIFrontDocumentPhotoMockURL,
-           let backURL = nativeUIBackDocumentPhotoMockURL {
-            self.verificationSheet?.mockCameraFeed(
-                frontDocumentImageFile: frontURL,
-                backDocumentImageFile: backURL
-            )
-        }
     }
 
+    @available(iOS 14.3, *)
     func setupVerificationSheetWebUI(responseJson: [String: String]) {
         guard let clientSecret = responseJson["client_secret"] else {
             assertionFailure("Did not receive a valid client secret.")
@@ -220,8 +206,12 @@ class PlaygroundViewController: UIViewController {
         }
     }
 
-    func displayAlert(_ message: String) {
-        let alertController = UIAlertController(title: "", message: message, preferredStyle: .alert)
+    func displayAlert(_ message: String, _ debugString: String?) {
+        var alertMessage = message
+        if let debugString = debugString {
+            alertMessage += "\n(\(debugString))"
+        }
+        let alertController = UIAlertController(title: "", message: alertMessage, preferredStyle: .alert)
         let OKAction = UIAlertAction(title: "OK", style: .default) { (action) in
             alertController.dismiss(animated: true) {
                 self.dismiss(animated: true, completion: nil)
@@ -230,6 +220,16 @@ class PlaygroundViewController: UIViewController {
         alertController.addAction(OKAction)
         present(alertController, animated: true, completion: nil)
     }
+
+    func mockDocumentCameraForSimulator() {
+        #if targetEnvironment(simulator)
+        if let frontImage = UIImage(named: "front_drivers_license.jpg"),
+           let backImage = UIImage(named: "back_drivers_license.jpg") {
+            IdentityVerificationSheet.simulatorDocumentCameraImages = [frontImage, backImage]
+        }
+        #endif
+    }
+
 
     @IBAction func didChangeVerificationType(_ sender: Any) {
         switch verificationType {
@@ -244,12 +244,83 @@ class PlaygroundViewController: UIViewController {
         nativeComponentsOptionsContainerView.isHidden = !useNativeComponentsSwitch.isOn
     }
 
-    @IBAction func didChangeNativeComponentErrorStepper(_ sender: Any) {
-        if nativeComponentErrorMockStepper.value >= 0 {
-            nativeComponentErrorMockLabel.text = "\(Int(nativeComponentErrorMockStepper.value))"
+    // MARK: – Customize Branding
+
+    var originalTintColor: UIColor?
+    let originalLabelFont = UILabel.appearance().font
+    let originalLabelColor = UILabel.appearance().textColor
+    let originalNavBarAppearance = UINavigationBar.appearance().standardAppearance
+
+    @IBAction func didToggleCustomColorsFonts(_ uiSwitch: UISwitch) {
+        if uiSwitch.isOn {
+            enableCustomColorsFonts()
         } else {
-            nativeComponentErrorMockLabel.text = "n/a"
+            disableCustomColorsFonts()
         }
+        applyUIAppearance()
+    }
+
+    func enableCustomColorsFonts() {
+        originalTintColor = view.window?.tintColor
+
+        let standardNavBarAppearance = UINavigationBarAppearance()
+        UINavigationBar.appearance().standardAppearance = standardNavBarAppearance
+
+        // Brand color can either be set using the window's tintColor
+        // or by configuring AccentColor in the app's Assets file
+        view.window?.tintColor = UIColor(named: "BrandColor")
+
+        if let customFont = UIFont(name: "Futura", size: 17) {
+            // Default font can be set on the UILabel's appearance
+            UILabel.appearance().font = customFont
+
+            // Navigation bar font can be set using `UINavigationBarAppearance`
+            let barButtonAppearance = UIBarButtonItemAppearance(style: .plain)
+            barButtonAppearance.normal.titleTextAttributes[.font] = customFont
+
+            standardNavBarAppearance.buttonAppearance = barButtonAppearance
+            standardNavBarAppearance.titleTextAttributes[.font] = customFont
+        }
+
+        // Default text color can be set on UILabel's appearance
+        UILabel.appearance().textColor = UIColor { traitCollection in
+            switch traitCollection.userInterfaceStyle {
+            case .dark:
+                return UIColor(red: 0.80, green: 0.80, blue: 0.85, alpha: 1)
+
+            default:
+                return UIColor(red: 0.24, green: 0.26, blue: 0.34, alpha: 1)
+            }
+        }
+
+        // Customize back button arrow
+        standardNavBarAppearance.setBackIndicatorImage(UIImage(named: "BackArrow"), transitionMaskImage: UIImage(named: "BackArrow"))
+    }
+
+    func disableCustomColorsFonts() {
+        view.window?.tintColor = originalTintColor
+        UILabel.appearance().font = originalLabelFont
+        UILabel.appearance().textColor = originalLabelColor
+        UINavigationBar.appearance().standardAppearance = originalNavBarAppearance
+        UINavigationBar.appearance().backIndicatorImage = nil
+    }
+
+    func applyUIAppearance() {
+        // Changes to UIAppearance are only applied when the view is added to the window hierarchy
+        UIApplication.shared.windows.forEach { window in
+            window.subviews.forEach { view in
+                view.removeFromSuperview()
+                window.addSubview(view)
+            }
+        }
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        // Reset custom colors if the view gets popped
+        guard presentedViewController == nil else {
+            return
+        }
+        disableCustomColorsFonts()
     }
 }
 

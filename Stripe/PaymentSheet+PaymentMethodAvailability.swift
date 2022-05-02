@@ -16,7 +16,13 @@ extension PaymentSheet {
     /// Modifying this property in a production app can lead to unexpected behavior.
     ///
     /// :nodoc:
-    @_spi(STP) public static var supportedPaymentMethods: [STPPaymentMethodType] = [.card, .iDEAL, .bancontact, .sofort, .SEPADebit, .klarna, .payPal, .EPS, .giropay, .przelewy24, .afterpayClearpay]
+    @_spi(STP) public static var supportedPaymentMethods: [STPPaymentMethodType] =  [.card, .iDEAL, .bancontact, .sofort, .SEPADebit, .klarna, .payPal, .EPS, .giropay, .przelewy24, .afterpayClearpay]
+    
+    /// An unordered list of paymentMethodtypes that can be used with Link in PaymentSheet
+    /// - Note: This is a var because it depends on the authenticated Link user
+    ///
+    /// :nodoc:
+    internal static var supportedLinkPaymentMethods: [STPPaymentMethodType] = []
 
     /// Returns whether or not PaymentSheet, with the given `PaymentMethodRequirementProvider`s, should make the given `paymentMethod` available to add.
     /// Note: This doesn't affect the availability of saved PMs.
@@ -35,10 +41,14 @@ extension PaymentSheet {
             switch paymentMethod {
             case .blik, .card, .cardPresent, .UPI, .weChatPay:
                 return []
-            case .alipay, .EPS, .FPX, .giropay, .grabPay, .netBanking, .payPal, .przelewy24, .klarna:
+            case .alipay, .EPS, .FPX, .giropay, .grabPay, .netBanking, .payPal, .przelewy24, .klarna, .linkInstantDebit:
                 return [.returnURL]
-            case .AUBECSDebit, .OXXO, .boleto:
+            case .USBankAccount:
+                return [.returnURL, .userSupportsDelayedPaymentMethods]
+            case .OXXO, .boleto:
                 return [.userSupportsDelayedPaymentMethods]
+            case .AUBECSDebit:
+                return [.notSettingUp, .userSupportsDelayedPaymentMethods]
             case .bancontact, .iDEAL:
                 return [.returnURL, .notSettingUp]
             case .SEPADebit:
@@ -47,9 +57,9 @@ extension PaymentSheet {
                 return [.returnURL, .userSupportsDelayedPaymentMethods]
             case .sofort:
                 return [.returnURL, .notSettingUp, .userSupportsDelayedPaymentMethods]
-            case .afterpayClearpay:
+            case .afterpayClearpay, .affirm:
                 return [.returnURL, .shippingAddress]
-            case .unknown:
+            case .link, .unknown:
                 return [.unavailable]
             }
         }()
@@ -82,6 +92,8 @@ extension PaymentSheet {
                 return []
             case .alipay:
                 return [.returnURL]
+            case .USBankAccount:
+                return [.returnURL, .userSupportsDelayedPaymentMethods]
             case .iDEAL, .bancontact, .sofort:
                 // SEPA-family PMs are disallowed until we can reuse them for PI+sfu and SI.
                 // n.b. While iDEAL and bancontact are themselves not delayed, they turn into SEPA upon save, which IS delayed.
@@ -89,12 +101,10 @@ extension PaymentSheet {
             case .SEPADebit:
                 // SEPA-family PMs are disallowed until we can reuse them for PI+sfu and SI.
                 return [.userSupportsDelayedPaymentMethods, .unavailable]
-            case .AUBECSDebit:
-                return [.userSupportsDelayedPaymentMethods]
             case .bacsDebit:
                 return [.returnURL, .userSupportsDelayedPaymentMethods]
-            case .cardPresent, .blik, .weChatPay, .grabPay, .FPX, .giropay, .przelewy24, .EPS,
-                 .netBanking, .OXXO, .afterpayClearpay, .payPal, .UPI, .boleto, .klarna, .unknown:
+            case .AUBECSDebit, .cardPresent, .blik, .weChatPay, .grabPay, .FPX, .giropay, .przelewy24, .EPS,
+                    .netBanking, .OXXO, .afterpayClearpay, .payPal, .UPI, .boleto, .klarna, .link, .linkInstantDebit, .affirm, .unknown:
                 return [.unavailable]
             }
         }()

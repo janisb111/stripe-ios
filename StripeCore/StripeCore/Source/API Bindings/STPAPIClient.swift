@@ -149,22 +149,11 @@ public class STPAPIClient {
             }
         #endif
     }
-
-    @_spi(STP) public static var paymentUserAgent: String {
-        var paymentUserAgent = "stripe-ios/\(STPAPIClient.STPSDKVersion)"
-        let components = [paymentUserAgent] + STPAnalyticsClient.sharedClient.productUsage
-        paymentUserAgent = components.joined(separator: "; ")
-        return paymentUserAgent
-    }
-    
-    @_spi(STP) public class func paramsAddingPaymentUserAgent(_ params: [String: Any]) -> [String: Any] {
-        var newParams = params
-        newParams["payment_user_agent"] = Self.paymentUserAgent
-        return newParams
-    }
     
     class func stripeUserAgentDetails(with appInfo: STPAppInfo?) -> String {
         var details: [String: String] = [
+            // This SDK isn't in Objective-C anymore, but we sometimes check for
+            // 'objective-c' to enable iOS SDK-specific behavior in the API.
             "lang": "objective-c",
             "bindings_version": STPSDKVersion,
         ]
@@ -204,10 +193,10 @@ public class STPAPIClient {
         return String(data: data ?? Data(), encoding: .utf8) ?? ""
     }
     
-    @_spi(STP) public func authorizationHeader(using ephemeralKeySecret: String? = nil) -> [String: String] {
-        let authorizationBearer = ephemeralKeySecret ?? publishableKey ?? ""
+    @_spi(STP) public func authorizationHeader(using substituteAuthorizationBearer: String? = nil) -> [String: String] {
+        let authorizationBearer = substituteAuthorizationBearer ?? publishableKey ?? ""
         var headers = ["Authorization": "Bearer " + authorizationBearer]
-        
+
         if publishableKeyIsUserKey {
             let liveMode = ProcessInfo.processInfo.environment["Stripe-Livemode"] != "false"
             headers["Stripe-Livemode"] = liveMode ? "true" : "false"

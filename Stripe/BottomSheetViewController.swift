@@ -19,6 +19,8 @@ protocol BottomSheetContentViewController: UIViewController {
 }
 
 /// A VC containing a content view controller and manages the layout of its SheetNavigationBar.
+/// For internal SDK use only
+@objc(STP_Internal_BottomSheetViewController)
 class BottomSheetViewController: UIViewController, PanModalPresentable {
     // MARK: - Views
     private lazy var scrollView: UIScrollView = {
@@ -59,6 +61,7 @@ class BottomSheetViewController: UIViewController, PanModalPresentable {
     }
     
     let isTestMode: Bool
+    let appearance: PaymentSheet.Appearance
 
     private var contentViewController: BottomSheetContentViewController {
         didSet(oldContentViewController) {
@@ -85,9 +88,18 @@ class BottomSheetViewController: UIViewController, PanModalPresentable {
         }
     }
 
-    required init(contentViewController: BottomSheetContentViewController, isTestMode: Bool) {
+    let didCancelNative3DS2: () -> ()
+    
+    required init(
+        contentViewController: BottomSheetContentViewController,
+        appearance: PaymentSheet.Appearance,
+        isTestMode: Bool,
+        didCancelNative3DS2: @escaping () -> ()
+    ) {
         self.contentViewController = contentViewController
+        self.appearance = appearance
         self.isTestMode = isTestMode
+        self.didCancelNative3DS2 = didCancelNative3DS2
 
         super.init(nibName: nil, bundle: nil)
 
@@ -97,6 +109,7 @@ class BottomSheetViewController: UIViewController, PanModalPresentable {
         contentViewController.didMove(toParent: self)
         contentContainerView.addArrangedSubview(contentViewController.view)
         navigationBarContainerView.addArrangedSubview(contentViewController.navigationBar)
+        self.view.backgroundColor = appearance.color.background
     }
 
     required init?(coder: NSCoder) {
@@ -223,8 +236,9 @@ extension BottomSheetViewController: UIScrollViewDelegate {
     }
 }
 
-// MARK: - STPAuthenticationContext
-extension BottomSheetViewController: STPAuthenticationContext {
+// MARK: - PaymentSheetAuthenticationContext
+extension BottomSheetViewController: PaymentSheetAuthenticationContext {
+    
     func authenticationPresentingViewController() -> UIViewController {
         return self
     }
@@ -247,7 +261,7 @@ extension BottomSheetViewController: STPAuthenticationContext {
         _ threeDS2ChallengeViewController: UIViewController, completion: @escaping () -> Void
     ) {
         let threeDS2ViewController = BottomSheet3DS2ViewController(
-            challengeViewController: threeDS2ChallengeViewController, isTestMode: isTestMode)
+            challengeViewController: threeDS2ChallengeViewController, appearance: appearance, isTestMode: isTestMode)
         threeDS2ViewController.delegate = self
         pushContentViewController(threeDS2ViewController)
         completion()
@@ -292,6 +306,6 @@ extension BottomSheetViewController: BottomSheet3DS2ViewControllerDelegate {
     func bottomSheet3DS2ViewControllerDidCancel(
         _ bottomSheet3DS2ViewController: BottomSheet3DS2ViewController
     ) {
-        STPPaymentHandler.shared().cancel3DS2ChallengeFlow()
+        didCancelNative3DS2()
     }
 }

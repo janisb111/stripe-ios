@@ -54,8 +54,16 @@ import Foundation
         STPLocalizedString("Last", "Label for last (family) name field")
     }
 
+    static var nameOnAccount: String {
+        STPLocalizedString("Name on account", "Label for Name on account field on form")
+    }
+
     static var invalid_email: String {
         STPLocalizedString("Your email is invalid.", "Error message when email is invalid")
+    }
+    
+    static var phone: String {
+        STPLocalizedString("Phone", "Caption for Phone field on address form")
     }
 
     static var optional_field: String {
@@ -63,6 +71,10 @@ import Foundation
             "%@ (optional)",
             "The label of a text field that is optional. For example, 'Email (optional)' or 'Name (optional)"
         )
+    }
+    
+    static var other: String {
+        STPLocalizedString("Other", "An option in a dropdown selector indicating the customer's desired selection is not in the list. e.g., 'Choose your bank: Bank1, Bank2, Other'")
     }
 
     // MARK: City field labels
@@ -180,5 +192,27 @@ import Foundation
             Label of an address field
             """
         )
+    }
+    // Mark: - Account
+    static var auBECSAccount: String {
+        STPLocalizedString(
+            "AU BECS account number",
+            """
+            Caption for AU BECS account number
+            """
+        )
+    }
+
+    // MARK: - Control strings
+    static var cancel: String {
+        STPLocalizedString("Cancel", "Button title to cancel action in an alert")
+    }
+
+    static var ok: String {
+        STPLocalizedString("OK", "ok button")
+    }
+
+    static var `continue`: String {
+        STPLocalizedString("Continue", "Text for continue button")
     }
 }

@@ -14,26 +14,22 @@ protocol PickerFieldViewDelegate: AnyObject {
 
 /**
  An input field that looks like TextFieldView but whose input is another view.
+ 
+ For internal SDK use only
  */
+@objc(STP_Internal_PickerFieldView)
 final class PickerFieldView: UIView {
     private lazy var toolbar = DoneButtonToolbar(delegate: self)
     private lazy var textField: PickerTextField = {
         let textField = PickerTextField()
         textField.inputView = pickerView
         textField.adjustsFontForContentSizeCategory = true
-        textField.font = ElementsUI.textFieldFont
+        textField.font = ElementsUITheme.current.fonts.subheadline
         textField.inputAccessoryView = toolbar
         textField.delegate = self
         return textField
     }()
-    private lazy var textFieldView: FloatingPlaceholderTextFieldView = {
-        let textFieldView = FloatingPlaceholderTextFieldView(
-            textField: textField,
-            image: shouldShowChevron ? Image.icon_chevron_down.makeImage() : nil
-        )
-        addAndPinSubview(textFieldView)
-        return textFieldView
-    }()
+    private var textFieldView: FloatingPlaceholderTextFieldView? = nil
 
     private let shouldShowChevron: Bool
     private let pickerView: UIView
@@ -45,13 +41,22 @@ final class PickerFieldView: UIView {
         }
         set {
             textField.text = newValue
-            textFieldView.updatePlaceholder(animated: true)
+            textFieldView?.updatePlaceholder(animated: true)
             
             // Note: Calling `layoutIfNeeded` when outside of the window
             // heirarchy causes autolayout errors
             if window != nil {
                 textField.layoutIfNeeded() // Fixes an issue on iOS 15 where setting textField properties causes it to lay out from zero size.
             }
+        }
+    }
+    
+    var displayTextAccessibilityLabel: String? {
+        get {
+            return textField.accessibilityLabel
+        }
+        set {
+            textField.accessibilityLabel = newValue
         }
     }
 
@@ -65,7 +70,7 @@ final class PickerFieldView: UIView {
        - delegate: Delegate for this view
      */
     init(
-        label: String,
+        label: String?,
         shouldShowChevron: Bool,
         pickerView: UIView,
         delegate: PickerFieldViewDelegate
@@ -74,9 +79,28 @@ final class PickerFieldView: UIView {
         self.pickerView = pickerView
         self.delegate = delegate
         super.init(frame: .zero)
-        layer.borderColor = ElementsUI.fieldBorderColor.cgColor
-
-        textFieldView.placeholder.text = label
+        layer.borderColor = ElementsUITheme.current.colors.border.cgColor
+        
+        if let label = label {
+            let floatingPlaceholderView = FloatingPlaceholderTextFieldView(
+                textField: textField,
+                image: shouldShowChevron ? Image.icon_chevron_down.makeImage() : nil
+            )
+            addAndPinSubview(floatingPlaceholderView)
+            floatingPlaceholderView.placeholder = label
+            textFieldView = floatingPlaceholderView
+        } else {
+            var views: [UIView] = [textField]
+            if shouldShowChevron {
+                let imageView = UIImageView(image: Image.icon_chevron_down.makeImage().withRenderingMode(.alwaysTemplate))
+                imageView.setContentHuggingPriority(.required, for: .horizontal)
+                imageView.tintColor = ElementsUITheme.current.colors.textFieldText
+                views.append(imageView)
+            }
+            let hStack = UIStackView(arrangedSubviews:views)
+            hStack.alignment = .center
+            addAndPinSubview(hStack)
+        }
 
         defer {
             isUserInteractionEnabled = true
@@ -91,13 +115,13 @@ final class PickerFieldView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        textFieldView.updatePlaceholder(animated: false)
+        textFieldView?.updatePlaceholder(animated: false)
     }
 
     override var isUserInteractionEnabled: Bool {
         didSet {
             if isUserInteractionEnabled {
-                textField.textColor = CompatibleColor.label
+                textField.textColor = ElementsUITheme.current.colors.textFieldText
             } else {
                 textField.textColor = CompatibleColor.tertiaryLabel
             }
@@ -109,7 +133,7 @@ final class PickerFieldView: UIView {
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
-        layer.borderColor = ElementsUI.fieldBorderColor.cgColor
+        layer.borderColor = ElementsUITheme.current.colors.border.cgColor
     }
 
     override var canBecomeFirstResponder: Bool {
@@ -121,6 +145,14 @@ final class PickerFieldView: UIView {
             return false
         }
         return textField.becomeFirstResponder()
+    }
+    
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard isUserInteractionEnabled, !isHidden, self.point(inside: point, with: event) else {
+            return nil
+        }
+        // Forward all events within our bounds to the textfield
+        return textField
     }
 }
 

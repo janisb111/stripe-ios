@@ -10,76 +10,111 @@ import XCTest
 
 final class DocumentTypeSelectViewControllerTest: XCTestCase {
 
-    var dataStore: VerificationPageDataStore!
-    var mockFlowController: VerificationSheetFlowControllerMock!
     var mockSheetController: VerificationSheetControllerMock!
 
     override func setUp() {
         super.setUp()
 
-        dataStore = .init()
-        mockFlowController = .init()
-        mockSheetController = .init(
-            flowController: mockFlowController,
-            dataStore: dataStore
-        )
+        mockSheetController = .init()
     }
 
-    func testNonEmptyDocumentTypes() {
-        let vc = makeViewController(withDocTypes: [
+    func testNonEmptyDocumentTypes() throws {
+        let vc = try makeViewController(withDocTypes: [
             "invalid_document_type": "foo",
-            "id_card": "Custom ID Card Label",
-            "passport": "Custom Passport Label",
+            DocumentType.idCard.rawValue: "Custom ID Card Label",
+            DocumentType.passport.rawValue: "Custom Passport Label",
         ])
         // Verify only passport & id card made it and ordered properly
         XCTAssertEqual(vc.documentTypeWithLabels, [
+            .init(documentType: .idCard, label: "Custom ID Card Label"),
             .init(documentType: .passport, label: "Custom Passport Label"),
-            .init(documentType: .idCard, label: "Custom ID Card Label")
         ])
     }
 
-    func testOnlyInvalidDocumentTypes() {
-        let vc = makeViewController(withDocTypes: [
-            "invalid_document_type": "foo",
-        ])
-        // Verify default types and labels are used
-        XCTAssertEqual(vc.documentTypeWithLabels, [
-            .init(documentType: .passport, label: "Passport"),
-            .init(documentType: .drivingLicense, label: "Driver's license"),
-            .init(documentType: .idCard, label: "Identity card")
-        ])
+    func testOnlyInvalidDocumentTypes() throws {
+        do {
+            let _ = try makeViewController(withDocTypes: [
+                "invalid_document_type": "foo",
+            ])
+            XCTFail("Expected `DocumentTypeSelectViewControllerError`")
+        } catch DocumentTypeSelectViewControllerError.noValidDocumentTypes(let providedDocumentTypes) {
+            XCTAssertEqual(providedDocumentTypes, ["invalid_document_type"])
+        } catch {
+            throw error
+        }
     }
 
-    func testEmptyDocumentTypes() {
-        let vc = makeViewController(withDocTypes: [:])
-        // Verify default types and labels are used
-        XCTAssertEqual(vc.documentTypeWithLabels, [
-            .init(documentType: .passport, label: "Passport"),
-            .init(documentType: .drivingLicense, label: "Driver's license"),
-            .init(documentType: .idCard, label: "Identity card")
+    func testEmptyDocumentTypes() throws {
+        do {
+            let _ = try makeViewController(withDocTypes: [:])
+            XCTFail("Expected `DocumentTypeSelectViewControllerError`")
+        } catch DocumentTypeSelectViewControllerError.noValidDocumentTypes(let providedDocumentTypes) {
+            XCTAssertEqual(providedDocumentTypes, [])
+        } catch {
+            throw error
+        }
+    }
+
+    func testSingleDocumentType() throws {
+        let instructionText = "Instruction text telling user to get their ID Card"
+        let vc = try DocumentTypeSelectViewController(
+            sheetController: mockSheetController,
+            staticContent: .init(
+                body: instructionText,
+                idDocumentTypeAllowlist: [
+                    DocumentType.idCard.rawValue: "ID Card",
+                ],
+                title: ""
+            )
+        )
+        // Verify view displays text instead of list
+        XCTAssertNil(vc.viewModel.listViewModel)
+        XCTAssertEqual(vc.viewModel.instructionText, instructionText)
+        // Verify button
+        guard let buttonViewModel = vc.buttonViewModel else {
+            return XCTFail("Expected buttonViewModel to not be nil")
+        }
+        // Verify button tap
+        buttonViewModel.didTap()
+        XCTAssertEqual(mockSheetController.savedData?.idDocumentType, .idCard)
+    }
+
+    func testMultipleDocumentType() throws {
+        let vc = try makeViewController(withDocTypes: [
+            DocumentType.idCard.rawValue: "Custom ID Card Label",
+            DocumentType.passport.rawValue: "Custom Passport Label",
         ])
+        // Verify view displays list instead of text
+        XCTAssertNil(vc.viewModel.instructionText)
+        XCTAssertEqual(vc.viewModel.listViewModel?.items.count, 2)
+        // Verify no button
+        XCTAssertNil(vc.buttonViewModel)
+        // Verify item tap
+        vc.viewModel.listViewModel?.items.first?.onTap?()
+        XCTAssertEqual(mockSheetController.savedData?.idDocumentType, .idCard)
     }
 
     func testSelectionPersistence() throws {
-        let vc = makeViewController(withDocTypes: [:])
+        let vc = try makeViewController(withDocTypes: [
+            DocumentType.drivingLicense.rawValue: "Driver's License",
+            DocumentType.idCard.rawValue: "Identity Card",
+            DocumentType.passport.rawValue: "Passport",
+        ])
         // Simulate user tapping the passport button
-        vc.didTapButton(documentType: .passport)
-        // Verify that dataStore is updated
-        XCTAssertEqual(dataStore.idDocumentType, .passport)
+        vc.didTapOption(documentType: .passport)
         // Verify that saveData was called
-        // Verify user was transitioned to next screen
-        wait(for: [mockSheetController.didFinishSaveDataExp, mockFlowController.didTransitionToNextScreenExp], timeout: 1)
+        XCTAssertEqual(mockSheetController.savedData?.idDocumentType, .passport)
     }
 }
 
 // MARK: - Helpers
 
 private extension DocumentTypeSelectViewControllerTest {
-    func makeViewController(withDocTypes docTypeAllowlist: [String: String]) -> DocumentTypeSelectViewController {
-        return DocumentTypeSelectViewController(
+    func makeViewController(withDocTypes docTypeAllowlist: [String: String]) throws -> DocumentTypeSelectViewController {
+        return try DocumentTypeSelectViewController(
             sheetController: mockSheetController,
             staticContent: .init(
-                buttonText: "",
+                body: nil,
                 idDocumentTypeAllowlist: docTypeAllowlist,
                 title: "",
                 _allResponseFieldsStorage: nil

@@ -9,7 +9,9 @@
 // Note: Do not import Stripe using `@_spi(STP)` in production.
 // This exposes internal functionality which may cause unexpected behavior if used directly.
 @_spi(STP) import Stripe
+@_spi(STP) import StripeCore
 import UIKit
+import SwiftUI
 
 class PaymentSheetTestPlayground: UIViewController {
     // Configuration
@@ -21,6 +23,7 @@ class PaymentSheetTestPlayground: UIViewController {
     @IBOutlet weak var modeSelector: UISegmentedControl!
     @IBOutlet weak var defaultBillingAddressSelector: UISegmentedControl!
     @IBOutlet weak var automaticPaymentMethodsSelector: UISegmentedControl!
+    @IBOutlet weak var linkSelector: UISegmentedControl!
     @IBOutlet weak var loadButton: UIButton!
     // Inline
     @IBOutlet weak var selectPaymentMethodImage: UIImageView!
@@ -40,6 +43,7 @@ class PaymentSheetTestPlayground: UIViewController {
     enum Currency: String, CaseIterable {
         case usd
         case eur
+        case aud
     }
 
     enum IntentMode: String, CaseIterable {
@@ -106,6 +110,7 @@ class PaymentSheetTestPlayground: UIViewController {
         configuration.merchantDisplayName = "Example, Inc."
         configuration.applePay = applePayConfiguration
         configuration.customer = customerConfiguration
+        configuration.appearance = appearance
         configuration.returnURL = "payments-example://stripe-redirect"
         if shouldSetDefaultBillingAddress {
             configuration.defaultBillingDetails.name = "Jane Doe"
@@ -128,7 +133,8 @@ class PaymentSheetTestPlayground: UIViewController {
     var ephemeralKey: String?
     var customerID: String?
     var manualFlow: PaymentSheet.FlowController?
-
+    var appearance = PaymentSheet.Appearance()
+    
     func makeAlertController() -> UIAlertController {
         let alertController = UIAlertController(
             title: "Complete", message: "Completed", preferredStyle: .alert)
@@ -143,7 +149,7 @@ class PaymentSheetTestPlayground: UIViewController {
         super.viewDidLoad()
 
         // Enable experimental payment methods.
-        PaymentSheet.supportedPaymentMethods = [.card, .iDEAL, .bancontact, .sofort, .SEPADebit, .EPS, .giropay, .przelewy24, .afterpayClearpay, .klarna, .payPal]
+        PaymentSheet.supportedPaymentMethods = [.AUBECSDebit, .card, .iDEAL, .bancontact, .sofort, .SEPADebit, .EPS, .giropay, .przelewy24, .afterpayClearpay, .klarna, .affirm, .payPal/*, .link*/] // Link disabled for Feb release
 
         checkoutButton.addTarget(self, action: #selector(didTapCheckoutButton), for: .touchUpInside)
         checkoutButton.isEnabled = false
@@ -227,6 +233,21 @@ class PaymentSheetTestPlayground: UIViewController {
         }
         self.selectPaymentMethodButton.setNeedsLayout()
     }
+    
+    @IBAction func appearanceButtonTapped(_ sender: Any) {
+        if #available(iOS 14.0, *) {
+            let vc = UIHostingController(rootView: AppearancePlaygroundView(appearance: appearance, doneAction: { updatedAppearance in
+                self.appearance = updatedAppearance
+                self.dismiss(animated: true, completion: nil)
+            }))
+
+            self.navigationController?.present(vc, animated: true, completion: nil)
+        } else {
+            let alert = UIAlertController(title: "Unavailable", message: "Appearance playground is only available in iOS 14+.", preferredStyle: UIAlertController.Style.alert)
+            alert.addAction(UIAlertAction(title: "Ok", style: UIAlertAction.Style.default, handler: nil))
+            self.present(alert, animated: true, completion: nil)
+        }
+    }
 }
 
 // MARK: - Backend
@@ -240,7 +261,7 @@ extension PaymentSheetTestPlayground {
         manualFlow = nil
 
         let session = URLSession.shared
-        let url = URL(string: "https://stripe-mobile-payment-sheet-test-playground-v5.glitch.me/checkout")!
+        let url = URL(string: "https://stripe-mobile-payment-sheet-test-playground-v6.glitch.me/checkout")!
         let customer: String = {
             switch customerMode {
             case .guest:
@@ -257,7 +278,8 @@ extension PaymentSheetTestPlayground {
             "currency": currency.rawValue,
             "mode": intentMode.rawValue,
             "set_shipping_address": shippingInfoSelector.selectedSegmentIndex == 1,
-            "automatic_payment_methods": automaticPaymentMethodsSelector.selectedSegmentIndex == 0
+            "automatic_payment_methods": automaticPaymentMethodsSelector.selectedSegmentIndex == 0,
+            "use_link": linkSelector.selectedSegmentIndex == 0
         ] as [String: Any]
         let json = try! JSONSerialization.data(withJSONObject: body, options: [])
         var urlRequest = URLRequest(url: url)
@@ -313,4 +335,6 @@ extension PaymentSheetTestPlayground {
         }
         task.resume()
     }
+    
+    
 }

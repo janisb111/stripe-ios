@@ -20,7 +20,7 @@ import UIKit
         
         public struct NameConfiguration: TextFieldElementConfiguration {
             @frozen public enum NameType {
-                case given, family, full
+                case given, family, full, onAccount
             }
 
             let type: NameType
@@ -34,6 +34,8 @@ import UIKit
                     return String.Localized.family_name
                 case .full:
                     return String.Localized.name
+                case .onAccount:
+                    return String.Localized.nameOnAccount
                 }
             }
             private var textContentType: UITextContentType {
@@ -42,7 +44,7 @@ import UIKit
                     return .givenName
                 case .family:
                     return .familyName
-                case .full:
+                case .full, .onAccount:
                     return .name
                 }
             }
@@ -60,7 +62,10 @@ import UIKit
         public static func makeFullName(defaultValue: String?) -> TextFieldElement {
             return TextFieldElement(configuration: NameConfiguration(type: .full, defaultValue: defaultValue))
         }
-        
+
+        public static func makeNameOnAccount(defaultValue: String?) -> TextFieldElement {
+            return TextFieldElement(configuration: NameConfiguration(type: .onAccount, defaultValue: defaultValue))
+        }
         // MARK: - Email
         
         struct EmailConfiguration: TextFieldElementConfiguration {
@@ -165,6 +170,66 @@ import UIKit
             
             func keyboardProperties(for text: String) -> TextFieldElement.KeyboardProperties {
                 return .init(type: .default, textContentType: .postalCode, autocapitalization: .allCharacters)
+            }
+        }
+        
+        // MARK: - Phone number
+        public struct PhoneNumberConfiguration: TextFieldElementConfiguration {
+            static let incompleteError = Error.incomplete(localizedDescription:
+                                                            STPLocalizedString("Incomplete phone number", "Error description for incomplete phone number"))
+            static let invalidError = Error.invalid(localizedDescription:
+                                                        STPLocalizedString("Unable to parse phone number", "Error string when we can't parse a phone number"))
+            
+            public let label: String
+            public let regionCode: String?
+            public let placeholderShouldFloat: Bool = false
+            
+            public init(regionCode: String?) {
+                self.regionCode = regionCode
+                self.label = {
+                    if let regionCode = regionCode,
+                       let metadata = PhoneNumber.Metadata.metadata(for: regionCode) {
+                        return metadata.sampleFilledPattern
+                    }
+                    return String.Localized.phone
+                }()
+            }
+            
+            public func validate(text: String, isOptional: Bool) -> TextFieldElement.ValidationState {
+                if text.isEmpty {
+                    return isOptional ? .valid : .invalid(Error.empty)
+                }
+                
+                if let phoneNumber = PhoneNumber(number: text, countryCode: regionCode) {
+                    return phoneNumber.isComplete ? .valid :
+                        .invalid(PhoneNumberConfiguration.incompleteError)
+                } else {
+                    // assume user has entered a format or for a region
+                    // the SDK doesn't know about
+                    // return valid as long as it's non-empty and let the server
+                    // decide
+                    return .valid
+                }
+            }
+            
+            public func keyboardProperties(for text: String) -> TextFieldElement.KeyboardProperties {
+                return .init(type: .phonePad, textContentType: .telephoneNumber, autocapitalization: .none)
+            }
+            
+            public var disallowedCharacters: CharacterSet {
+                if regionCode?.isEmpty ?? true {
+                    return CharacterSet.stp_asciiDigit.union(CharacterSet(charactersIn: "+")).inverted // allow a + for custom country code
+                } else {
+                    return CharacterSet.stp_asciiDigit.inverted
+                }
+            }
+            
+            public func makeDisplayText(for text: String) -> NSAttributedString {
+                if let phoneNumber = PhoneNumber(number: text, countryCode: regionCode) {
+                    return NSAttributedString(string: phoneNumber.string(as: .national))
+                } else {
+                    return NSAttributedString(string: text)
+                }
             }
         }
     }

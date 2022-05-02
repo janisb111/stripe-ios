@@ -40,6 +40,9 @@
 /* Title shown above a card entry form */
 "Add a card" = "Agrega una tarjeta";
 
+/* Button prompt to add a bank account as a payment method. */
+"Add bank account" = "Agregar cuenta bancaria";
+
 /* Label of a button displayed below a card entry form that saves the card details */
 "Add card" = "Agregar tarjeta";
 
@@ -51,6 +54,9 @@
 
 /* Address line 2 placeholder for billing address form. */
 "Address line 2 (optional)" = "Segunda línea de la dirección (opcional)";
+
+/* Payment Method type brand name */
+"Affirm" = "Affirm";
 
 /* Payment Method type brand name  */
 "Afterpay" = "Afterpay";
@@ -91,6 +97,9 @@
 /* Source type brand name */
 "Bancontact" = "Bancontact";
 
+/* Link Instant Debit payment method display name */
+"Bank" = "Banco";
+
 /* Label for Bank Account selection or detail entry form */
 "Bank Account" = "Cuenta bancaria";
 
@@ -105,6 +114,12 @@
 
 /* Klarna buy now or pay later copy */
 "Buy now or pay later with Klarna." = "Compra ahora y paga después con Klarna.";
+
+/* Mandate text displayed when paying via Link instant debit. */
+"By continuing, you agree to authorize payments pursuant to these <terms>terms</terms>." = "Al continuar, aceptas autorizar pagos conforme a estas <terms>condiciones</terms>.";
+
+/* Legal text shown when creating a Link account. */
+"By joining Link, you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>." = "Al unirte a Link, aceptas las <terms>Condiciones de servicio</terms> y la <privacy>Política de privacidad</privacy>.";
 
 /* SEPA legal authorization text – must use official translations. */
 "By providing your IBAN and confirming this payment, you are authorizing %@ and Stripe, our payment service provider, to send instructions to your bank to debit your account and your bank to debit your account in accordance with those instructions. You are entitled to a refund from your bank under the terms and conditions of your agreement with your bank. A refund must be claimed within 8 weeks starting from the date on which your account was debited." = "Al proporcionar tu IBAN y confirmar el pago, estás autorizando a %@ y a Stripe, nuestro proveedor de servicios de pago, a enviar instrucciones a tu banco para que este haga un débito en tu cuenta y lo haga conforme a esas instrucciones. Tienes derecho a un rembolso del banco según los términos y condiciones del acuerdo que tengas con tu banco. El rembolso debe reclamarse en el plazo de 8 semanas a partir de la fecha en la que se hizo el débito.";
@@ -126,9 +141,6 @@
 
 /* Label for entering CVV in text field */
 "CVV" = "CVV";
-
-/* Button title to cancel action in an alert */
-"Cancel" = "Cancelar";
 
 /* Title for credit card number entry field */
 "Card" = "Tarjeta";
@@ -153,9 +165,6 @@
 
 /* Title for contact info form */
 "Contact" = "Contacto";
-
-/* Text for continue button */
-"Continue" = "Continuar";
 
 /* Title for delivery address entry section */
 "DELIVERY ADDRESS" = "DIRECCIÓN DE ENTREGA";
@@ -200,7 +209,7 @@
 "Klarna" = "Klarna";
 
 /* Link Payment Method type brand name */
-"Link" = "Vincular";
+"Link" = "Link";
 
 /* Title for screen when data is still loading from the network. */
 "Loading…" = "Cargando...";
@@ -232,9 +241,6 @@
 /* Button to move to the next text entry field */
 "Next" = "Siguiente";
 
-/* No comment provided by engineer. */
-"OK" = "ACEPTAR";
-
 /* Payment Method type brand name */
 "OXXO" = "OXXO";
 
@@ -246,9 +252,6 @@
 
 /* Title of a section containing a card form that will collect the payment information from the user. */
 "Or pay with a card" = "O pagar con tarjeta";
-
-/* An option in a dropdown selector indicating the customer's desired selection is not in the list. e.g., 'Choose your bank: Bank1, Bank2, Other' */
-"Other" = "Otro";
 
 /* Source type brand name */
 "P24" = "P24";
@@ -267,9 +270,6 @@
 
 /* Title for Payment Method screen */
 "Payment Method" = "Método de pago";
-
-/* Caption for Phone field on address form */
-"Phone" = "Teléfono";
 
 /* Accessibility instructions for card scanning. */
 "Point the camera at your card." = "Apunta la cámara a la tarjeta.";
@@ -332,9 +332,6 @@
 /* The label of a switch indicating whether to save the user's card for future payment */
 
 "Save this card for future Stripe payments" = "Guardar esta tarjeta para realizar compras futuras en Stripe";
-/* Label of a button displayed below a payment method form. Tapping the button closes the form and uses the entered payment method details for checkout in the next step */
-
-"Select" = "Seleccionar";
 /* label for iDEAL-bank selection picker */
 
 "Select bank" = "Seleccionar banco";

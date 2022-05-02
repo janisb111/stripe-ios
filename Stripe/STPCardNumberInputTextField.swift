@@ -10,6 +10,14 @@ import UIKit
 @_spi(STP) import StripeUICore
 
 class STPCardNumberInputTextField: STPInputTextField {
+    
+    /// Describes which input fields can take input
+    enum InputMode {
+        /// All input fields can be edited
+        case standard
+        // PAN field is locked, all others are editable
+        case panLocked
+    }
 
     struct LayoutConstants {
         static let loadingIndicatorOffset: CGFloat = 4
@@ -19,10 +27,13 @@ class STPCardNumberInputTextField: STPInputTextField {
         return (validator as! STPCardNumberInputTextFieldValidator).cardBrand
     }
 
-    public convenience init() {
+    public convenience init(inputMode: InputMode = .standard, prefillDetails: STPCardFormView.PrefillDetails? = nil) {
+        // Don't format for panLocked input mode
         self.init(
-            formatter: STPCardNumberInputTextFieldFormatter(),
-            validator: STPCardNumberInputTextFieldValidator())
+            formatter: inputMode == .panLocked ? STPInputTextFieldFormatter() : STPCardNumberInputTextFieldFormatter(),
+            validator: STPCardNumberInputTextFieldValidator(inputMode: inputMode, cardBrand: prefillDetails?.cardBrand))
+        
+        self.text = prefillDetails?.formattedLast4 // pre-fill last 4 if available
     }
 
     let brandImageView = CardBrandView()
@@ -34,7 +45,6 @@ class STPCardNumberInputTextField: STPInputTextField {
     }()
 
     required init(formatter: STPInputTextFieldFormatter, validator: STPInputTextFieldValidator) {
-        assert(formatter.isKind(of: STPCardNumberInputTextFieldFormatter.self))
         assert(validator.isKind(of: STPCardNumberInputTextFieldValidator.self))
         super.init(formatter: formatter, validator: validator)
         keyboardType = .asciiCapableNumberPad

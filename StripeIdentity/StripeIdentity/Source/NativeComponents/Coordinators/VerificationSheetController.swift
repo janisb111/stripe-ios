@@ -25,162 +25,221 @@ protocol VerificationSheetControllerDelegate: AnyObject {
 }
 
 protocol VerificationSheetControllerProtocol: AnyObject {
+    var apiClient: IdentityAPIClient { get }
     var flowController: VerificationSheetFlowControllerProtocol { get }
-    var dataStore: VerificationPageDataStore { get }
-    var mockCameraFeed: MockIdentityDocumentCameraFeed? { get }
+    var mlModelLoader: IdentityMLModelLoaderProtocol { get }
+    var collectedData: VerificationPageCollectedData { get }
+
+    var delegate: VerificationSheetControllerDelegate? { get set }
 
     func loadAndUpdateUI()
 
-    func uploadDocument(image: UIImage) -> Future<String>
-
-    func saveData(
-        completion: @escaping (VerificationSheetAPIContent) -> Void
+    func saveAndTransition(
+        collectedData: VerificationPageCollectedData,
+        completion: @escaping () -> Void
     )
 
-    func submit(
-        completion: @escaping (VerificationSheetAPIContent) -> Void
+    func saveDocumentFileDataAndTransition(
+        documentUploader: DocumentUploaderProtocol,
+        completion: @escaping () -> Void
     )
 }
 
+@available(iOS 13, *)
 final class VerificationSheetController: VerificationSheetControllerProtocol {
 
     weak var delegate: VerificationSheetControllerDelegate?
 
-    let verificationSessionId: String
-    let ephemeralKeySecret: String
-
-    let addressSpecProvider: AddressSpecProvider
-    var apiClient: IdentityAPIClient
+    let apiClient: IdentityAPIClient
     let flowController: VerificationSheetFlowControllerProtocol
-    let dataStore = VerificationPageDataStore()
-    var mockCameraFeed: MockIdentityDocumentCameraFeed?
+    let mlModelLoader: IdentityMLModelLoaderProtocol
 
-    /// Content returned from the API
-    var apiContent = VerificationSheetAPIContent()
+    /// Cache of the data that's been sent to the server
+    private(set) var collectedData = VerificationPageCollectedData()
+
+    // MARK: API Response Properties
+
+    #if DEBUG
+    // Make settable for tests only
+    var verificationPageResponse: Result<VerificationPage, Error>?
+    var isVerificationPageSubmitted = false
+    #else
+    /// Static content returned from the initial API request describing how to
+    /// configure the verification flow experience
+    private(set) var verificationPageResponse: Result<VerificationPage, Error>?
+
+    /// If the VerificationPage was successfully submitted
+    private(set) var isVerificationPageSubmitted = false
+    #endif
+
+    // MARK: - Init
 
     init(
-        verificationSessionId: String,
-        ephemeralKeySecret: String,
-        apiClient: IdentityAPIClient = STPAPIClient.makeIdentityClient(),
-        addressSpecProvider: AddressSpecProvider = .shared,
-        flowController: VerificationSheetFlowControllerProtocol = VerificationSheetFlowController()
+        apiClient: IdentityAPIClient,
+        flowController: VerificationSheetFlowControllerProtocol,
+        mlModelLoader: IdentityMLModelLoaderProtocol
     ) {
-        self.verificationSessionId = verificationSessionId
-        self.ephemeralKeySecret = ephemeralKeySecret
-        self.addressSpecProvider = addressSpecProvider
         self.apiClient = apiClient
         self.flowController = flowController
-        
+        self.mlModelLoader = mlModelLoader
+
         flowController.delegate = self
     }
 
+    // MARK: - Load
+
     /// Makes API calls to load the verification sheet. When the API response is complete, transitions to the first screen in the flow.
     func loadAndUpdateUI() {
-        load {
+        load().observe(on: .main) { result in
             self.flowController.transitionToNextScreen(
-                apiContent: self.apiContent,
-                sheetController: self
+                staticContentResult: result,
+                updateDataResult: nil,
+                sheetController: self,
+                completion: { }
+            )
+        }
+    }
+
+    func load() -> Future<VerificationPage> {
+        let returnedPromise = Promise<VerificationPage>()
+        // Only update `verificationPageResponse` on main
+        apiClient.getIdentityVerificationPage().observe(on: .main) { [weak self] result in
+            self?.verificationPageResponse = result
+            if case let .success(verificationPage) = result {
+                self?.startLoadingMLModels(from: verificationPage)
+            }
+            returnedPromise.fullfill(with: result)
+        }
+        return returnedPromise
+    }
+
+    func startLoadingMLModels(from verificationPage: VerificationPage) {
+        mlModelLoader.startLoadingDocumentModels(
+            from: verificationPage.documentCapture.models
+        )
+    }
+
+    // MARK: - Save
+
+    /**
+     Saves the `collectedData` to the server and caches the saved fields if successful
+     - Note: `completion` block is always executed on the main thread.
+     */
+    func saveAndTransition(
+        collectedData: VerificationPageCollectedData,
+        completion: @escaping () -> Void
+    ) {
+        apiClient.updateIdentityVerificationPageData(
+            updating: .init(
+                clearData: .init(clearFields: flowController.uncollectedFields),
+                collectedData: collectedData,
+                _additionalParametersStorage: nil
+            )
+        ).observe(on: .main) { [weak self] result in
+            self?.saveCheckSubmitAndTransition(
+                collectedData: collectedData,
+                updateDataResult: result,
+                completion: completion
             )
         }
     }
 
     /**
-     Makes API calls to load the verification sheet.
+     Waits until documents are done uploading then saves front and back of document to the server
      - Note: `completion` block is always executed on the main thread.
      */
-    func load(
+    func saveDocumentFileDataAndTransition(
+        documentUploader: DocumentUploaderProtocol,
         completion: @escaping () -> Void
     ) {
-        // Start API request
-        let verificationPagePromise = apiClient.getIdentityVerificationPage(
-            id: verificationSessionId,
-            ephemeralKeySecret: ephemeralKeySecret
-        )
-
-        // Start loading address specs
-        addressSpecProvider.loadAddressSpecs().chained { _ in
-            // Loading address spec finished.
-            // API request may or may not have finished at this point, but returning
-            // the API request promise means it's result will be observed below.
-            return verificationPagePromise
-        }.observe { result in
-            DispatchQueue.main.async { [weak self] in
-                // API request finished
-                guard let self = self else { return }
-                self.apiContent.setStaticContent(result: result)
-                completion()
-            }
+        var optionalCollectedData: VerificationPageCollectedData?
+        documentUploader.frontBackUploadFuture.chained { [weak flowController, apiClient] (front, back) -> Future<VerificationPageData> in
+            let collectedData = VerificationPageCollectedData(
+                idDocumentBack: back,
+                idDocumentFront: front
+            )
+            optionalCollectedData = collectedData
+            return apiClient.updateIdentityVerificationPageData(
+                updating: VerificationPageDataUpdate(
+                    clearData: .init(clearFields: flowController?.uncollectedFields ?? []),
+                    collectedData: collectedData,
+                    _additionalParametersStorage: nil
+                )
+            )
+        }.observe(on: .main) { [weak self] result in
+            self?.saveCheckSubmitAndTransition(
+                collectedData: optionalCollectedData,
+                updateDataResult: result,
+                completion: completion
+            )
         }
     }
 
     /**
-     Saves the values in `dataStore` to server
-     - Note
+     1. If the save was successful, caches the collectedData
+     2. If all fields have been collected, submits the verification page
+     3. Transitions to the next screen
      */
-    func saveData(
-        completion: @escaping (VerificationSheetAPIContent) -> Void
+    private func saveCheckSubmitAndTransition(
+        collectedData: VerificationPageCollectedData?,
+        updateDataResult: Result<VerificationPageData, Error>,
+        completion: @escaping () -> Void
     ) {
-        apiClient.updateIdentityVerificationPageData(
-            id: verificationSessionId,
-            updating: dataStore.toAPIModel,
-            ephemeralKeySecret: ephemeralKeySecret
-        ).observe { [weak self] result in
-            DispatchQueue.main.async {
-                guard let self = self else {
-                    // Always call completion block even if `self` has been deinitialized
-                    completion(VerificationSheetAPIContent())
-                    return
-                }
-                self.apiContent.setSessionData(result: result)
+        // Only mutate properties on the main thread
+        assert(Thread.isMainThread)
 
-                completion(self.apiContent)
-            }
+        guard let verificationPageResponse = verificationPageResponse else {
+            assertionFailure("verificationPageResponse is nil")
+            return
         }
-    }
 
-    /// Uploads a document image and returns a Future containing the ID of the uploaded file
-    func uploadDocument(image: UIImage) -> Future<String> {
-        // TODO(mludowise|IDPROD-2953,IDPROD-2956): Use ephemeralKey and
-        // argument values from API response
-        return apiClient.uploadImage(
-            image,
-            compressionQuality: 0.5,
-            purpose: StripeFile.Purpose.identityDocument.rawValue,
-            fileName: "image",
-            ownedBy: nil,
-            ephemeralKeySecret: nil
-        ).chained { file in
-            return Promise(value: file.id)
+        // Setup block to transition to next screen with a given result
+        let transitionBlock: (Result<VerificationPageData, Error>?) -> Void = { [weak self] result in
+            guard let self = self else { return }
+
+            self.flowController.transitionToNextScreen(
+                staticContentResult: verificationPageResponse,
+                updateDataResult: result,
+                sheetController: self,
+                completion: completion
+            )
         }
-    }
 
-    func submit(
-        completion: @escaping (VerificationSheetAPIContent) -> Void
-    ) {
-        apiClient.submitIdentityVerificationPage(
-            id: verificationSessionId,
-            ephemeralKeySecret: ephemeralKeySecret
-        ).observe { [weak self] result in
-            DispatchQueue.main.async {
-                guard let self = self else {
-                    // Always call completion block even if `self` has been deinitialized
-                    completion(VerificationSheetAPIContent())
-                    return
-                }
-                self.apiContent.setSessionData(result: result)
+        // Check if result is a failure
+        guard case .success = updateDataResult,
+              case .success(let verificationPage) = verificationPageResponse
+        else {
+            transitionBlock(updateDataResult)
+            return
+        }
 
-                completion(self.apiContent)
-            }
+        // Cache collected data if response is a success
+        if let collectedData = collectedData {
+            self.collectedData.merge(collectedData)
+        }
+
+        // Check if more data needs to be collected
+        guard flowController.isFinishedCollectingData(for: verificationPage) else {
+            transitionBlock(updateDataResult)
+            return
+        }
+
+        // Submit VerificationPage and transition
+        apiClient.submitIdentityVerificationPage().observe(on: .main) { [weak self] result in
+            self?.isVerificationPageSubmitted = (try? result.get())?.submitted == true
+            transitionBlock(result)
         }
     }
 }
 
 // MARK: - VerificationSheetFlowControllerDelegate
 
+@available(iOS 13, *)
 extension VerificationSheetController: VerificationSheetFlowControllerDelegate {
     func verificationSheetFlowControllerDidDismiss(_ flowController: VerificationSheetFlowControllerProtocol) {
-        let result: IdentityVerificationSheet.VerificationFlowResult =
-            (apiContent.submitted == true) ? .flowCompleted : .flowCanceled
-        delegate?.verificationSheetController(self, didFinish: result)
+        delegate?.verificationSheetController(
+            self,
+            didFinish: self.isVerificationPageSubmitted ? .flowCompleted : .flowCanceled
+        )
     }
 }

@@ -43,6 +43,16 @@ public protocol STPCardFormViewDelegate: NSObjectProtocol {
 }
 
 /**
+ Internal only delegate methods for STPCardFormView
+ */
+internal protocol STPCardFormViewInternalDelegate {
+    /**
+     Delegate method that is called when the selected country is changed.
+     */
+    func cardFormView(_ form: STPCardFormView, didUpdateSelectedCountry countryCode: String?)
+}
+
+/**
  `STPCardFormView` provides a multiline interface for users to input their
  credit card details as well as billing postal code and provides an interface to access
  the created `STPPaymentMethodParams`.
@@ -57,6 +67,7 @@ public class STPCardFormView: STPFormView {
     
     let billingAddressSubForm: BillingAddressSubForm
     let postalCodeRequirement: STPPostalCodeRequirement
+    let inputMode: STPCardNumberInputTextField.InputMode
     
     var countryField: STPCountryPickerInputField {
         return billingAddressSubForm.countryPickerField
@@ -99,6 +110,10 @@ public class STPCardFormView: STPFormView {
      */
     @objc
     public weak var delegate: STPCardFormViewDelegate?
+    
+    internal var internalDelegate: STPCardFormViewInternalDelegate? {
+        return delegate as? STPCardFormViewInternalDelegate
+    }
     
     var _backgroundColor: UIColor?
     
@@ -267,6 +282,9 @@ public class STPCardFormView: STPFormView {
     public override var isUserInteractionEnabled: Bool {
         didSet {
             updateCurrentBackgroundColor()
+            if inputMode == .panLocked {
+                self.numberField.isUserInteractionEnabled = false
+            }
         }
     }
     
@@ -281,7 +299,8 @@ public class STPCardFormView: STPFormView {
         self.init(billingAddressCollection: .automatic,
                   includeCardScanning: false,
                   mergeBillingFields: true,
-                  style: style
+                  style: style,
+                  prefillDetails: nil
         )
         
         hideShadow = true
@@ -299,17 +318,21 @@ public class STPCardFormView: STPFormView {
         includeCardScanning: Bool = true,
         mergeBillingFields: Bool = false,
         style: STPCardFormViewStyle = .standard,
-        postalCodeRequirement: STPPostalCodeRequirement = .standard
+        postalCodeRequirement: STPPostalCodeRequirement = .standard,
+        prefillDetails: PrefillDetails? = nil,
+        inputMode: STPCardNumberInputTextField.InputMode = .standard
     ) {
-        self.init(numberField: STPCardNumberInputTextField(),
-                  cvcField: STPCardCVCInputTextField(),
-                  expiryField: STPCardExpiryInputTextField(),
+        self.init(numberField: STPCardNumberInputTextField(inputMode: inputMode, prefillDetails: prefillDetails),
+                  cvcField: STPCardCVCInputTextField(prefillDetails: prefillDetails),
+                  expiryField: STPCardExpiryInputTextField(prefillDetails: prefillDetails),
                   billingAddressSubForm: BillingAddressSubForm(billingAddressCollection: billingAddressCollection,
                                                                postalCodeRequirement: postalCodeRequirement),
                   includeCardScanning: includeCardScanning,
                   mergeBillingFields: mergeBillingFields,
                   style: style,
-                  postalCodeRequirement: postalCodeRequirement)
+                  postalCodeRequirement: postalCodeRequirement,
+                  prefillDetails: prefillDetails,
+                  inputMode: inputMode)
     }
     
     required init(numberField: STPCardNumberInputTextField,
@@ -319,7 +342,9 @@ public class STPCardFormView: STPFormView {
                   includeCardScanning: Bool,
                   mergeBillingFields: Bool,
                   style: STPCardFormViewStyle = .standard,
-                  postalCodeRequirement: STPPostalCodeRequirement = .standard
+                  postalCodeRequirement: STPPostalCodeRequirement = .standard,
+                  prefillDetails: PrefillDetails? = nil,
+                  inputMode: STPCardNumberInputTextField.InputMode = .standard
     ) {
         self.numberField = numberField
         self.cvcField = cvcField
@@ -327,6 +352,11 @@ public class STPCardFormView: STPFormView {
         self.billingAddressSubForm = billingAddressSubForm
         self.style = style
         self.postalCodeRequirement = postalCodeRequirement
+        self.inputMode = inputMode
+        
+        if inputMode == .panLocked {
+            self.numberField.isUserInteractionEnabled = false
+        }
         
         var scanButton: UIButton? = nil
         if includeCardScanning {
@@ -444,6 +474,10 @@ public class STPCardFormView: STPFormView {
             if shouldFocusOnPostalCode {
                 _  = postalCodeField.becomeFirstResponder()
             }
+            
+            if countryChanged {
+                self.internalDelegate?.cardFormView(self, didUpdateSelectedCountry: countryCode)
+            }
         }
         super.validationDidUpdate(
             to: state, from: previousState, for: unformattedInput, in: textField)
@@ -451,18 +485,18 @@ public class STPCardFormView: STPFormView {
             if cardParams != nil {
                 // we transitioned to complete
                 delegate?.cardFormView(self, didChangeToStateComplete: true)
-                internalDelegate?.formView(self, didChangeToStateComplete: true)
+                formViewInternalDelegate?.formView(self, didChangeToStateComplete: true)
             }
         } else if case .valid = previousState, state != previousState {
             delegate?.cardFormView(self, didChangeToStateComplete: false)
-            internalDelegate?.formView(self, didChangeToStateComplete: false)
+            formViewInternalDelegate?.formView(self, didChangeToStateComplete: false)
         }
         
         updateBindedPaymentMethodParams()
     }
     
     @objc func scanButtonTapped(sender: UIButton) {
-        self.internalDelegate?.formView(self, didTapAccessoryButton: sender)
+        self.formViewInternalDelegate?.formView(self, didTapAccessoryButton: sender)
     }
     
     /// Returns true iff the form can mark the error to one of its fields
@@ -656,4 +690,23 @@ extension STPCardFormView {
 /// :nodoc:
 @_spi(STP) extension STPCardFormView: STPAnalyticsProtocol {
     @_spi(STP) public static var stp_analyticsIdentifier: String = "STPCardFormView"
+}
+
+extension STPCardFormView {
+
+    struct PrefillDetails {
+        let last4: String
+        let expiryMonth: Int
+        let expiryYear: Int
+        let cardBrand: STPCardBrand
+        
+        var formattedLast4: String {
+            return "•••• \(last4)"
+        }
+        
+        var formattedExpiry: String {
+            let paddedZero = expiryMonth < 10
+            return "\(paddedZero ? "0" : "")\(expiryMonth)/\(expiryYear)"
+        }
+    }
 }

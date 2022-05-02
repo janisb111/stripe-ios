@@ -48,6 +48,23 @@ extension PaymentSheet {
             }
         }
     }
+    
+    /// Options for the default state of save payment method controls
+    /// @note Some jurisdictions may have rules governing the ability to default to opt-out behaviors
+    public enum SavePaymentMethodOptInBehavior {
+        
+        /// (Default) The SDK will apply opt-out behavior for supported countries.
+        /// Currently, this behavior is supported in the US.
+        case automatic
+        
+        /// The control will always default to unselected and users
+        /// will have to explicitly interact to save their payment method
+        case requiresOptIn
+        
+        /// The control will always default to selected and users
+        /// will have to explicitly interact to not save their payment method
+        case requiresOptOut
+    }
 
     /// Configuration for PaymentSheet
     public struct Configuration {
@@ -70,11 +87,8 @@ extension PaymentSheet {
         var billingAddressCollectionLevel: BillingAddressCollectionLevel = .automatic
 
         /// The color of the Buy or Add button. Defaults to `.systemBlue`
-        public var primaryButtonColor: UIColor = .systemBlue {
-            didSet {
-                ConfirmButton.BuyButton.appearance().backgroundColor = primaryButtonColor
-            }
-        }
+        // TODO(porter): Add comment about how this is equal to setting appearance.primaryColor closer to release
+        public var primaryButtonColor: UIColor = .systemBlue
 
         private var styleRawValue: Int = 0  // SheetStyle.automatic.rawValue
         /// The color styling to use for PaymentSheet UI
@@ -108,6 +122,22 @@ extension PaymentSheet {
         
         /// PaymentSheet pre-populates fields with the values provided.
         public var defaultBillingDetails: BillingDetails = BillingDetails()
+        
+        /// PaymentSheet offers users an option to save some payment methods for later use.
+        /// Default value is .automatic
+        /// @see SavePaymentMethodOptInBehavior
+        public var savePaymentMethodOptInBehavior: SavePaymentMethodOptInBehavior = .automatic
+
+        /// Beta API
+        /// The customer's email address.
+        /// Set this value if you have pre-collected the customer's email
+        /// address and want to use that value to prefill Link login forms.
+        public var customerEmail: String? = nil
+        
+        internal var linkPaymentMethodsOnly: Bool = false
+        
+        // TOOD:(porter) Make public for release
+        @_spi(STP) public var appearance = PaymentSheet.Appearance.default
     }
 
     /// Configuration related to the Stripe Customer

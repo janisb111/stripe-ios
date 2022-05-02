@@ -43,6 +43,18 @@ enum Intent {
             return si.orderedPaymentMethodTypes
         }
     }
+
+    var isPaymentIntent: Bool {
+        if case .paymentIntent(_) = self {
+            return true
+        }
+
+        return false
+    }
+
+    var supportsLink: Bool {
+        return recommendedPaymentMethodTypes.contains(.link)
+    }
 }
 
 // MARK: - IntentClientSecret
@@ -61,6 +73,7 @@ enum IntentClientSecret {
 /// An internal type representing both `STPPaymentIntentParams` and `STPSetupIntentParams`
 /// - Note: Assumes you're confirming with a new payment method
 class IntentConfirmParams {
+
     let paymentMethodParams: STPPaymentMethodParams
     let paymentMethodType: STPPaymentMethodType
     
@@ -70,9 +83,13 @@ class IntentConfirmParams {
     /// - Note: PaymentIntent-only
     var paymentMethodOptions: STPConfirmPaymentMethodOptions?
     
-    init(type: STPPaymentMethodType) {
-        paymentMethodType = type
-        paymentMethodParams = STPPaymentMethodParams(type: type)
+    convenience init(type: STPPaymentMethodType) {
+        self.init(params: STPPaymentMethodParams(type: type))
+    }
+
+    init(params: STPPaymentMethodParams) {
+        self.paymentMethodType = params.type
+        self.paymentMethodParams = params
     }
     
     func makeParams(paymentIntentClientSecret: String) -> STPPaymentIntentParams {
@@ -81,7 +98,7 @@ class IntentConfirmParams {
         let options = paymentMethodOptions ?? STPConfirmPaymentMethodOptions()
         options.setSetupFutureUsageIfNecessary(shouldSavePaymentMethod, paymentMethodType: paymentMethodType)
         params.paymentMethodOptions = options
-        
+
         return params
     }
     

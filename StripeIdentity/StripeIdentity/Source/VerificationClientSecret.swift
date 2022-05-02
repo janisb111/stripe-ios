@@ -15,7 +15,7 @@ struct VerificationClientSecret {
 }
 
 extension VerificationClientSecret {
-    private static let expectedComponentsCount = 4
+    private static let expectedComponentsCount = 5
 
     /**
      Initialize from string.
@@ -38,19 +38,13 @@ extension VerificationClientSecret {
                 !components[1].isEmpty &&
                 (components[1].rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) == nil) &&
                 components[2] == "secret" &&
-                !components[3].isEmpty &&
-                (components[3].rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) == nil) else {
+                (components[3] == "test" || components[3] == "live") &&
+                !components[4].isEmpty &&
+                (components[4].rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) == nil) else {
             return nil
         }
 
         verificationSessionId = "\(components[0])_\(components[1])"
-        urlToken = String(components[3])
-    }
-
-    // TODO(mludowise|IDPROD-2542): Recomposing the original string value is a
-    // temporary workaround until we're no longer reliant on structured client
-    // secrets
-    var stringValue: String {
-        return verificationSessionId + "_secret_" + urlToken
+        urlToken = String(components[4])
     }
 }

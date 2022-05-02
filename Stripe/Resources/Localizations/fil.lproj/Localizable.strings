@@ -40,6 +40,9 @@
 /* Title shown above a card entry form */
 "Add a card" = "Magdagdag ng isang kard";
 
+/* Button prompt to add a bank account as a payment method. */
+"Add bank account" = "Magdagdag ng account sa bangko";
+
 /* Label of a button displayed below a card entry form that saves the card details */
 "Add card" = "Magdagdag ng kard";
 
@@ -51,6 +54,9 @@
 
 /* Address line 2 placeholder for billing address form. */
 "Address line 2 (optional)" = "Pangalawang linya ng adres";
+
+/* Payment Method type brand name */
+"Affirm" = "Affirm";
 
 /* Payment Method type brand name  */
 "Afterpay" = "Afterpay";
@@ -91,6 +97,9 @@
 /* Source type brand name */
 "Bancontact" = "Bancontact";
 
+/* Link Instant Debit payment method display name */
+"Bank" = "Bangko";
+
 /* Label for Bank Account selection or detail entry form */
 "Bank Account" = "Account sa Bangko";
 
@@ -105,6 +114,12 @@
 
 /* Klarna buy now or pay later copy */
 "Buy now or pay later with Klarna." = "Bumili ngayon o magbayad sa ibang pagkakataon gamit ang Klarna.";
+
+/* Mandate text displayed when paying via Link instant debit. */
+"By continuing, you agree to authorize payments pursuant to these <terms>terms</terms>." = "Sa pagpapatuloy, sumasang-ayon ka na pahintulutan ang mga pagbabayad alinsunod sa <terms>mga tuntunin</terms> na ito.";
+
+/* Legal text shown when creating a Link account. */
+"By joining Link, you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>." = "Sa pagsali sa Link, sumasang-ayon ka sa <terms>Mga Tuntunin</terms> at <privacy>Patakaran sa Pagkapribado</privacy>.";
 
 /* SEPA legal authorization text – must use official translations. */
 "By providing your IBAN and confirming this payment, you are authorizing %@ and Stripe, our payment service provider, to send instructions to your bank to debit your account and your bank to debit your account in accordance with those instructions. You are entitled to a refund from your bank under the terms and conditions of your agreement with your bank. A refund must be claimed within 8 weeks starting from the date on which your account was debited." = "Sa pamamagitan ng pagbibigay ng iyong IBAN at pagkumpirma sa pagbabayad na ito, iyong pinapahintulutan ang %@ at ang Stripe, ang aming payment service provider, na magpadala ng mga tagubilin sa iyong bangko na magbawas sa iyong account at sa iyong bangko na magbawas sa iyong account alinsunod sa mga tagubilin na iyon. May karapatan kang ipabalik ang ibinayad mula sa iyong bangko sa ilalim ng mga takda at kondisyon ng iyong kasunduan sa iyong bangko. Ang pagsasauli ay dapat mong hingin sa loob ng 8 linggo mula sa petsa ng pagkabawas sa iyong account.";
@@ -126,9 +141,6 @@
 
 /* Label for entering CVV in text field */
 "CVV" = "CVV";
-
-/* Button title to cancel action in an alert */
-"Cancel" = "Kanselahin";
 
 /* Title for credit card number entry field */
 "Card" = "Kard";
@@ -153,9 +165,6 @@
 
 /* Title for contact info form */
 "Contact" = "Kontak";
-
-/* Text for continue button */
-"Continue" = "Magpatuloy";
 
 /* Title for delivery address entry section */
 "DELIVERY ADDRESS" = "ADRES NG PADADALHAN";
@@ -200,7 +209,7 @@
 "Klarna" = "Klarna";
 
 /* Link Payment Method type brand name */
-"Link" = "I-link";
+"Link" = "Link";
 
 /* Title for screen when data is still loading from the network. */
 "Loading…" = "Naglo-load...";
@@ -232,9 +241,6 @@
 /* Button to move to the next text entry field */
 "Next" = "Susunod";
 
-/* No comment provided by engineer. */
-"OK" = "OK";
-
 /* Payment Method type brand name */
 "OXXO" = "OXXO";
 
@@ -246,9 +252,6 @@
 
 /* Title of a section containing a card form that will collect the payment information from the user. */
 "Or pay with a card" = "O magbayad gamit ang kard";
-
-/* An option in a dropdown selector indicating the customer's desired selection is not in the list. e.g., 'Choose your bank: Bank1, Bank2, Other' */
-"Other" = "Iba Pa";
 
 /* Source type brand name */
 "P24" = "P24";
@@ -267,9 +270,6 @@
 
 /* Title for Payment Method screen */
 "Payment Method" = "Paraan ng Pagbabayad";
-
-/* Caption for Phone field on address form */
-"Phone" = "Telepono";
 
 /* Accessibility instructions for card scanning. */
 "Point the camera at your card." = "Itapat ang kamera sa iyong kard.";
@@ -332,9 +332,6 @@
 /* The label of a switch indicating whether to save the user's card for future payment */
 
 "Save this card for future Stripe payments" = "I-save ang kard na ito para sa mga pagbabayad sa Stripe sa hinaharap";
-/* Label of a button displayed below a payment method form. Tapping the button closes the form and uses the entered payment method details for checkout in the next step */
-
-"Select" = "Piliin";
 /* label for iDEAL-bank selection picker */
 
 "Select bank" = "Piliin ang bangko";

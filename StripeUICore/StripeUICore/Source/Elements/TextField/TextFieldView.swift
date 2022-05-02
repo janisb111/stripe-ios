@@ -17,7 +17,10 @@ protocol TextFieldViewDelegate: AnyObject {
 /**
  A text input field view with a floating placeholder and images.
  - Seealso: `TextFieldElement.ViewModel`
+ 
+ For internal SDK use only
  */
+@objc(STP_Internal_TextFieldView)
 class TextFieldView: UIView {
     weak var delegate: TextFieldViewDelegate?
     private lazy var toolbar = DoneButtonToolbar(delegate: self)
@@ -36,14 +39,14 @@ class TextFieldView: UIView {
     
     // MARK: - Views
     
-    private lazy var textField: UITextField = {
+    private(set) lazy var textField: UITextField = {
         let textField = UITextField()
         textField.delegate = self
         textField.addTarget(self, action: #selector(textDidChange), for: .editingChanged)
         textField.autocorrectionType = .no
         textField.spellCheckingType = .no
         textField.adjustsFontForContentSizeCategory = true
-        textField.font = ElementsUI.textFieldFont
+        textField.font = ElementsUITheme.current.fonts.subheadline
         return textField
     }()
     private lazy var textFieldView: FloatingPlaceholderTextFieldView = {
@@ -71,6 +74,7 @@ class TextFieldView: UIView {
         guard isUserInteractionEnabled, !isHidden, self.point(inside: point, with: event) else {
             return nil
         }
+        
         // Forward all events within our bounds to the textfield
         return textField
     }
@@ -92,8 +96,18 @@ class TextFieldView: UIView {
     
     func updateUI(with viewModel: TextFieldElement.ViewModel) {
         self.viewModel = viewModel
+        // Update layout
+        textFieldView.shouldInsetContent = viewModel.shouldInsetContent
+        
         // Update placeholder, text
-        textFieldView.placeholder.text = viewModel.placeholder
+        textFieldView.placeholder = viewModel.floatingPlaceholder
+        if let staticPlaceholder = viewModel.staticPlaceholder {
+            textField.attributedPlaceholder = NSAttributedString(string: staticPlaceholder,
+                                                                 attributes: [.foregroundColor: ElementsUITheme.current.colors.placeholderText,
+                                                                                          .font: ElementsUITheme.current.fonts.subheadline])
+        } else {
+            textField.attributedPlaceholder = nil
+        }
 
         // Setting attributedText moves the cursor to the end, so we grab the cursor position now
         // Get the offset of the cursor from the end of the textField so it will keep
@@ -121,11 +135,11 @@ class TextFieldView: UIView {
         if case .invalid(let error) = viewModel.validationState,
            error.shouldDisplay(isUserEditing: textField.isEditing) {
             superview?.bringSubviewToFront(self)
-            layer.borderColor = UIColor.systemRed.cgColor
-            textField.textColor = UIColor.systemRed
+            layer.borderColor = ElementsUITheme.current.colors.danger.cgColor
+            textField.textColor = ElementsUITheme.current.colors.danger
         } else {
-            layer.borderColor = ElementsUI.fieldBorderColor.cgColor
-            textField.textColor = isUserInteractionEnabled ? CompatibleColor.label : CompatibleColor.tertiaryLabel
+            layer.borderColor = ElementsUITheme.current.colors.border.cgColor
+            textField.textColor = isUserInteractionEnabled ? ElementsUITheme.current.colors.textFieldText : CompatibleColor.tertiaryLabel
         }
         if frame != .zero {
             textField.layoutIfNeeded() // Fixes an issue on iOS 15 where setting textField properties cause it to lay out from zero size.

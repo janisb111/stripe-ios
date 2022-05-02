@@ -11,7 +11,7 @@ import UIKit
 
 extension PaymentOption {
     /// Returns an icon representing the payment option, suitable for display on a checkout screen
-    func makeIcon() -> UIImage {
+    func makeIcon(for traitCollection: UITraitCollection? = nil) -> UIImage {
         switch self {
         case .applePay:
             return Image.apple_pay_mark.makeImage().withRenderingMode(.alwaysOriginal)
@@ -19,18 +19,30 @@ extension PaymentOption {
             return paymentMethod.makeIcon()
         case .new(let confirmParams):
             return confirmParams.paymentMethodParams.makeIcon()
+        case .link(_, let confirmOption):
+            switch confirmOption {
+            case .forNewAccount(_, let paymentMethodParams):
+                return paymentMethodParams.makeIcon()
+            case .withPaymentDetails(let paymentDetails):
+                return paymentDetails.makeIcon()
+            case .withPaymentMethodParams(let paymentMethodParams):
+                return paymentMethodParams.makeIcon()
+            }
         }
     }
 
     /// Returns an image representing the payment option, suitable for display within PaymentSheet cells
-    func makeCarouselImage() -> UIImage {
+    func makeCarouselImage(for view: UIView) -> UIImage {
         switch self {
         case .applePay:
-            return makeIcon()
+            return makeIcon(for: view.traitCollection)
         case .saved(let paymentMethod):
-            return paymentMethod.makeCarouselImage()
+            return paymentMethod.makeCarouselImage(for: view)
         case .new(let confirmParams):
-            return confirmParams.paymentMethodParams.makeCarouselImage()
+            return confirmParams.paymentMethodParams.makeCarouselImage(for: view)
+        case .link:
+            assertionFailure("Link is not offered in PaymentSheet carousel")
+            return UIImage()
         }
     }
 }
@@ -52,7 +64,7 @@ extension STPPaymentMethod {
         }
     }
 
-    func makeCarouselImage() -> UIImage {
+    func makeCarouselImage(for view: UIView) -> UIImage {
         if type == .card, let cardBrand = card?.brand {
             return cardBrand.makeCarouselImage()
         }
@@ -76,7 +88,7 @@ extension STPPaymentMethodParams {
         }
     }
 
-    func makeCarouselImage() -> UIImage {
+    func makeCarouselImage(for view: UIView) -> UIImage {
         if type == .card, let card = card, let number = card.number {
             let cardBrand = STPCardValidator.brand(forNumber: number)
             return cardBrand.makeCarouselImage()
@@ -85,8 +97,27 @@ extension STPPaymentMethodParams {
     }
 }
 
+extension ConsumerPaymentDetails {
+    func makeIcon() -> UIImage {
+        switch details {
+            
+        case .card(let card):
+            return STPImageLibrary.cardBrandImage(for: card.brand)
+        case .bankAccount(let bankAccount):
+            return STPImageLibrary.bankIcon(for: bankAccount.iconCode)
+        }
+    }
+}
+
 extension STPPaymentMethodType {
-    func makeImage() -> UIImage {
+    
+    /// A few payment method type icons need to be tinted white or black as they do not have
+    /// light/dark agnostic icons
+    var iconRequiresTinting: Bool {
+        return self == .card || self == .AUBECSDebit || self == .linkInstantDebit
+    }
+    
+    func makeImage(forDarkBackground: Bool = false) -> UIImage {
         guard let image: Image = {
             switch self {
             case .card:
@@ -107,8 +138,14 @@ extension STPPaymentMethodType {
                 return .pm_type_afterpay
             case .sofort, .klarna:
                 return .pm_type_klarna
+            case .affirm:
+                return .pm_type_affirm
             case .payPal:
                 return .pm_type_paypal
+            case .AUBECSDebit:
+                return .pm_type_aubecsdebit
+            case .linkInstantDebit:
+                return .pm_type_link_instant_debit
             default:
                 return nil
             }
@@ -116,14 +153,8 @@ extension STPPaymentMethodType {
             assertionFailure()
             return UIImage()
         }
-        // Tint the image white for darkmode
-        if isDarkMode(),
-           let imageTintedWhite = image.makeImage(template: true)
-            .compatible_withTintColor(.white)?
-            .withRenderingMode(.alwaysOriginal) {
-            return imageTintedWhite
-        } else {
-            return image.makeImage()
-        }
+        
+        // payment method type icons are light/dark agnostic except PayPal
+        return image.makeImage(darkMode: self == .payPal ? forDarkBackground : false)
     }
 }

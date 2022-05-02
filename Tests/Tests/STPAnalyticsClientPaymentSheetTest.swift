@@ -68,6 +68,7 @@ class STPAnalyticsClientPaymentSheetTest: XCTestCase {
 
         let _ = PaymentSheet.FlowController(
             intent: .paymentIntent(STPFixtures.paymentIntent()), savedPaymentMethods: [],
+            linkAccount: nil,
             configuration: PaymentSheet.Configuration())
         XCTAssertTrue(client.productUsage.contains("PaymentSheet.FlowController"))
     }
@@ -76,19 +77,29 @@ class STPAnalyticsClientPaymentSheetTest: XCTestCase {
         let client = STPTestingAnalyticsClient()
         let event1 = XCTestExpectation(description: "mc_custom_sheet_newpm_show")
         client.registerExpectation(event1)
-        client.logPaymentSheetShow(isCustom: true, paymentMethod: .newPM)
+        client.logPaymentSheetShow(isCustom: true, paymentMethod: .newPM, linkEnabled: false, activeLinkSession: false)
 
         let event2 = XCTestExpectation(description: "mc_complete_sheet_savedpm_show")
         client.registerExpectation(event2)
-        client.logPaymentSheetShow(isCustom: false, paymentMethod: .savedPM)
+        client.logPaymentSheetShow(isCustom: false, paymentMethod: .savedPM, linkEnabled: false, activeLinkSession: false)
 
         let event3 = XCTestExpectation(description: "mc_complete_payment_savedpm_success")
         client.registerExpectation(event3)
-        client.logPaymentSheetPayment(isCustom: false, paymentMethod: .savedPM, result: .completed)
+        client.logPaymentSheetPayment(
+            isCustom: false,
+            paymentMethod: .savedPM,
+            result: .completed,
+            linkEnabled: false,
+            activeLinkSession: false)
 
         let event4 = XCTestExpectation(description: "mc_custom_payment_applepay_failure")
         client.registerExpectation(event4)
-        client.logPaymentSheetPayment(isCustom: true, paymentMethod: .applePay, result: .failed(error: PaymentSheetError.unknown(debugDescription: "Error")))
+        client.logPaymentSheetPayment(
+            isCustom: true,
+            paymentMethod: .applePay,
+            result: .failed(error: PaymentSheetError.unknown(debugDescription: "Error")),
+            linkEnabled: false,
+            activeLinkSession: false)
 
         let event5 = XCTestExpectation(description: "mc_custom_paymentoption_applepay_select")
         client.registerExpectation(event5)
@@ -120,6 +131,7 @@ class STPAnalyticsClientPaymentSheetTest: XCTestCase {
         // verify
         XCTAssertEqual(15, payload.count)
         XCTAssertNotNil(payload["device_type"] as? String)
+        // In xctest, this is the version of Xcode
         XCTAssertNotNil(payload["app_version"] as? String)
         XCTAssertEqual("none", payload["ocr_type"] as? String)
         XCTAssertEqual(STPAnalyticEvent.mcInitCompleteApplePay.rawValue, payload["event"] as? String)
@@ -127,8 +139,9 @@ class STPAnalyticsClientPaymentSheetTest: XCTestCase {
         XCTAssertEqual("analytics.stripeios-1.0", payload["analytics_ua"] as? String)
         XCTAssertEqual("xctest", payload["app_name"] as? String)
         XCTAssertNotNil(payload["os_version"] as? String)
-        XCTAssertEqual("full", payload["ui_usage_level"] as? String)
+        XCTAssertNil(payload["ui_usage_level"])
         XCTAssertTrue(payload["apple_pay_enabled"] as? Bool ?? false)
+        XCTAssertEqual("legacy", payload["pay_var"] as? String)
         XCTAssertEqual(STPAPIClient.STPSDKVersion, payload["bindings_version"] as? String)
         XCTAssertEqual("testVal", payload["testKey"] as? String)
         XCTAssertEqual("X", payload["install"] as? String)
@@ -140,6 +153,28 @@ class STPAnalyticsClientPaymentSheetTest: XCTestCase {
         let productUsage = try XCTUnwrap(payload["product_usage"] as? [String])
         XCTAssertEqual(1, productUsage.count)
         XCTAssertEqual(STPPaymentContext.stp_analyticsIdentifier, productUsage[0])
+    }
+
+    func testLogPaymentSheetPayment_shouldIncludeDuration() throws {
+        let client = STPTestingAnalyticsClient()
+
+        client.logPaymentSheetShow(
+            isCustom: false,
+            paymentMethod: .newPM,
+            linkEnabled: false,
+            activeLinkSession: false
+        )
+
+        client.logPaymentSheetPayment(
+            isCustom: false,
+            paymentMethod: .savedPM,
+            result: .completed,
+            linkEnabled: false,
+            activeLinkSession: false
+        )
+
+        let duration = client.lastPayload?["duration"] as? TimeInterval
+        XCTAssertNotNil(duration)
     }
 }
 
@@ -161,6 +196,8 @@ private extension STPAnalyticsClientPaymentSheetTest {
 private class STPTestingAnalyticsClient: STPAnalyticsClient {
     var expectedEvents: [String: XCTestExpectation] = [:]
 
+    var lastPayload: [String: Any]?
+
     func registerExpectation(_ expectation: XCTestExpectation) {
         expectedEvents[expectation.description] = expectation
     }
@@ -170,5 +207,7 @@ private class STPTestingAnalyticsClient: STPAnalyticsClient {
            let expectedEvent = expectedEvents[event] {
             expectedEvent.fulfill()
         }
+
+        lastPayload = payload
     }
 }

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreGraphics
 @_spi(STP) import StripeCore
 
 
@@ -13,12 +14,16 @@ import Foundation
 struct VerificationPageStaticContentDocumentCapturePage: StripeDecodable, Equatable {
     let autocaptureTimeout: Int
     let filePurpose: String
-    let highResImageCompressionQuality: Decimal
-    let highResImageCropPadding: Decimal
+    let highResImageCompressionQuality: CGFloat
+    let highResImageCropPadding: CGFloat
     let highResImageMaxDimension: Int
-    let lowResImageCompressionQuality: Decimal
-    let lowResImageMaxDimension: Decimal
+    let iosIdCardBackBarcodeTimeout: Int
+    let iosIdCardBackCountryBarcodeSymbologies: [String: String]
+    let lowResImageCompressionQuality: CGFloat
+    let lowResImageMaxDimension: Int
     let models: VerificationPageStaticContentDocumentCaptureModels
+    let motionBlurMinDuration: Int
+    let motionBlurMinIou: CGFloat
     let requireLiveCapture: Bool
 
     var _allResponseFieldsStorage: NonEncodableParameters?

@@ -25,6 +25,29 @@ final public class IdentityVerificationSheet {
         case flowFailed(error: Error)
     }
 
+    /// Configuration for an IdentityVerificationSheet
+    public struct Configuration {
+        /**
+         An image of your customer-facing business logo.
+
+         - Note: The recommended image size is 32 x 32 points. The image will be
+         displayed in both light and dark modes, if the app supports it. Use a
+         dynamic UIImage to support different images in light vs dark mode.
+         */
+        public var brandLogo: UIImage
+
+        /**
+         Initializes a Configuration.
+         - Parameters:
+           - brandLogo: An image of your customer-facing business logo.
+             The recommended image size is 32 x 32 points. The image will be
+             displayed in both light and dark modes, if the app supports it.
+         */
+        public init(brandLogo: UIImage) {
+            self.brandLogo = brandLogo
+        }
+    }
+
     /**
      The client secret of the Stripe VerificationSession object.
      See https://stripe.com/docs/api/identity/verification_sessions
@@ -34,13 +57,15 @@ final public class IdentityVerificationSheet {
     // TODO(mludowise|IDPROD-2542): Make non-optional when native component
     // experience is ready for release.
     // This is required to be non-null for native experience.
-    private let verificationSheetController: VerificationSheetController?
+    let verificationSheetController: VerificationSheetControllerProtocol?
 
     /**
-     Initializes an `IdentityVerificationSheet`
+     Initializes a web-based `IdentityVerificationSheet`.
+
      - Parameters:
        - verificationSessionClientSecret: The [client secret](https://stripe.com/docs/api/identity/verification_sessions) of a Stripe VerificationSession object.
      */
+    @available(iOS 14.3, *)
     public convenience init(verificationSessionClientSecret: String) {
         self.init(
             verificationSessionClientSecret: verificationSessionClientSecret,
@@ -50,32 +75,42 @@ final public class IdentityVerificationSheet {
     }
 
     /**
-     Initializes an `IdentityVerificationSheet` using native iOS components (in development) instead of a web view
+     Initializes an `IdentityVerificationSheet` from native iOS components.
 
-     :nodoc:
-     - Note: Modifying this property in a production app can lead to unexpected behavior.
-     TODO(mludowise|IDPROD-2542): Remove `spi` when native component experience is ready for release.
+     - Note: This initializer and creating an ephemeral key for a
+     VerificationSession is available on an invite only basis. Please contact
+     [support+identity@stripe.com](mailto:support+identity@stripe.com) to learn
+     more.
 
      - Parameters:
        - verificationSessionId: The id of a Stripe [VerificationSession](https://stripe.com/docs/api/identity/verification_sessions) object.
        - ephemeralKeySecret: A short-lived token that allows the SDK to access a [VerificationSession](https://stripe.com/docs/api/identity/verification_sessions) object.
+       - configuration: Configuration for the `IdentityVerificationSheet` including your brand logo.
      */
-    @_spi(STP) public convenience init(
+    @available(iOS 13, *)
+    public convenience init(
         verificationSessionId: String,
-        ephemeralKeySecret: String
+        ephemeralKeySecret: String,
+        configuration: Configuration
     ) {
         self.init(
             verificationSessionClientSecret: "",
             verificationSheetController: VerificationSheetController(
-                verificationSessionId: verificationSessionId,
-                ephemeralKeySecret: ephemeralKeySecret
+                apiClient: IdentityAPIClientImpl(
+                    verificationSessionId: verificationSessionId,
+                    ephemeralKeySecret: ephemeralKeySecret
+                ),
+                flowController: VerificationSheetFlowController(
+                    brandLogo: configuration.brandLogo
+                ),
+                mlModelLoader: IdentityMLModelLoader()
             ),
             analyticsClient: STPAnalyticsClient.sharedClient
         )
     }
 
     init(verificationSessionClientSecret: String,
-         verificationSheetController: VerificationSheetController?,
+         verificationSheetController: VerificationSheetControllerProtocol?,
          analyticsClient: STPAnalyticsClientProtocol) {
         self.verificationSessionClientSecret = verificationSessionClientSecret
         self.clientSecret = VerificationClientSecret(string: verificationSessionClientSecret)
@@ -92,29 +127,15 @@ final public class IdentityVerificationSheet {
        - presentingViewController: The view controller to present the identity verification sheet.
        - completion: Called with the result of the verification session after the identity verification sheet is dismissed.
      */
-    @available(iOS 14.3, *)
     @available(iOSApplicationExtension, unavailable)
     public func present(
-        from presentingViewController: UIViewController,
-        completion: @escaping (VerificationFlowResult) -> Void
-    ) {
-        presentInternal(from: presentingViewController, completion: completion)
-    }
-
-    /*
-     TODO(mludowise|RUN_MOBILESDK-120): Internal method for `present` so we can
-     call it form tests that run on versions prior to iOS 14. This can be removed
-     after we've updated our CI to run tests on iOS 14.
-     */
-    @available(iOSApplicationExtension, unavailable)
-    func presentInternal(
         from presentingViewController: UIViewController,
         completion: @escaping (VerificationFlowResult) -> Void
     ) {
         // Overwrite completion closure to retain self until called
         let completion: (VerificationFlowResult) -> Void = { result in
             let verificationSessionId = self.clientSecret?.verificationSessionId
-                ?? self.verificationSheetController?.verificationSessionId
+            ?? self.verificationSheetController?.apiClient.verificationSessionId
             self.analyticsClient.log(analytic: VerificationSheetCompletionAnalytic.make(
                 verificationSessionId: verificationSessionId,
                 sessionResult: result
@@ -142,7 +163,7 @@ final public class IdentityVerificationSheet {
 
         if let verificationSheetController = verificationSheetController {
             // Use native UI
-            verificationSessionId = verificationSheetController.verificationSessionId
+            verificationSessionId = verificationSheetController.apiClient.verificationSessionId
             navigationController = verificationSheetController.flowController.navigationController
             verificationSheetController.loadAndUpdateUI()
         } else {
@@ -165,16 +186,8 @@ final public class IdentityVerificationSheet {
 
     // MARK: - Private
 
-    // Analytics client to use for logging analytics
-    //
-    // NOTE: Swift 5.4 introduced a fix where private vars couldn't conform to @_spi protocols
-    // See https://github.com/apple/swift/commit/5f5372a3fca19e7fd9f67e79b7f9ddbc12e467fe
-    #if swift(<5.4)
-    /// :nodoc:
-    @_spi(STP) public let analyticsClient: STPAnalyticsClientProtocol
-    #else
+    /// Analytics client to use for logging analytics
     private let analyticsClient: STPAnalyticsClientProtocol
-    #endif
 
     /// Completion block called when the sheet is closed or fails to open
     private var completion: ((VerificationFlowResult) -> Void)?
@@ -182,34 +195,12 @@ final public class IdentityVerificationSheet {
     /// Parsed client secret string
     private let clientSecret: VerificationClientSecret?
 
-    // MARK: - Experimental / API Mocks
+    // MARK: - Simulator Mocking
 
-    /**
-     If using native iOS components (in development), load mock data from the local file system instead of making a live request.
-
-     :nodoc:
-
-     TODO(mludowise|IDPROD-2734): Remove this property when endpoint is live
-     */
-    @_spi(STP) public func mockNativeUIAPIResponse(
-        verificationPageDataFileURL: URL,
-        displayErrorOnScreen: Int?
-    ) {
-        verificationSheetController?.apiClient = MockIdentityAPIClient(
-            verificationPageDataFileURL: verificationPageDataFileURL,
-            displayErrorOnScreen: displayErrorOnScreen,
-            responseDelay: 1
-        )
-    }
-
-    @_spi(STP) public func mockCameraFeed(
-        frontDocumentImageFile: URL,
-        backDocumentImageFile: URL
-    ) {
-        verificationSheetController?.mockCameraFeed = MockIdentityDocumentCameraFeed(
-            imageFiles: frontDocumentImageFile, backDocumentImageFile
-        )
-    }
+    #if targetEnvironment(simulator)
+    /// When running on the simulator, mocks the camera output for document scanning with these images
+    public static var simulatorDocumentCameraImages: [UIImage] = []
+    #endif
 }
 
 // MARK: - VerificationFlowWebViewControllerDelegate

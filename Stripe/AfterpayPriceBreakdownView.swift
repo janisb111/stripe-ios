@@ -18,7 +18,8 @@ import SafariServices
 /// Multi row (width can't contain all subviews):
 ///   Pay in 4 interest-free payments of %@ with
 ///   [Afterpay logo] [info button]
-
+/// For internal SDK use only
+@objc(STP_Internal_AfterpayPriceBreakdownView)
 class AfterpayPriceBreakdownView: UIView {
     private let priceBreakdownLabel = UILabel()
     
@@ -123,15 +124,13 @@ class AfterpayPriceBreakdownView: UIView {
     
     private func generatePriceBreakdownString(installmentAmountString: String) -> NSMutableAttributedString {
         let amountStringAttributes = [
-            NSAttributedString.Key.font:
-                UIFontMetrics(forTextStyle: .subheadline)
-                    .scaledFont(for: UIFont.systemFont(ofSize: 14, weight: .bold))
+            NSAttributedString.Key.font: ElementsUITheme.current.fonts.subheadlineBold,
+            .foregroundColor: ElementsUITheme.current.colors.bodyText
         ]
         
         let stringAttributes = [
-            NSAttributedString.Key.font:
-                UIFontMetrics(forTextStyle: .subheadline)
-                .scaledFont(for: UIFont.systemFont(ofSize: 14, weight: .regular))
+            NSAttributedString.Key.font: ElementsUITheme.current.fonts.subheadline,
+            .foregroundColor: ElementsUITheme.current.colors.bodyText
         ]
         
         let amountString = NSMutableAttributedString(

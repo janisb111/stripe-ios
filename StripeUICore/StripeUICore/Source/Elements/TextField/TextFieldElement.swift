@@ -25,10 +25,22 @@ import UIKit
             delegate?.didUpdate(element: self)
         }
     }
+    
+    public var shouldInsetContent: Bool = true {
+        didSet {
+            textFieldView.updateUI(with: viewModel)
+            // this is UI only, no need to update delegate
+        }
+    }
+    
     lazy var textFieldView: TextFieldView = {
         return TextFieldView(viewModel: viewModel, delegate: self)
     }()
-    let configuration: TextFieldElementConfiguration
+    var configuration: TextFieldElementConfiguration {
+        didSet {
+            resetText()
+        }
+    }
     public private(set) lazy var text: String = {
         sanitize(text: configuration.defaultValue ?? "")
     }()
@@ -36,30 +48,28 @@ import UIKit
     public var validationState: ValidationState {
         return configuration.validate(text: text, isOptional: isOptional)
     }
-    public var errorText: String? {
-        guard
-            case .invalid(let error) = validationState,
-            error.shouldDisplay(isUserEditing: isEditing)
-        else {
-            return nil
-        }
-        return error.localizedDescription
-    }
     
     // MARK: - ViewModel
     public struct KeyboardProperties {
+        public init(type: UIKeyboardType, textContentType: UITextContentType?, autocapitalization: UITextAutocapitalizationType) {
+            self.type = type
+            self.textContentType = textContentType
+            self.autocapitalization = autocapitalization
+        }
+        
         let type: UIKeyboardType
         let textContentType: UITextContentType?
         let autocapitalization: UITextAutocapitalizationType
     }
 
     struct ViewModel {
-        var placeholder: String
-        var text: String
+        var floatingPlaceholder: String?
+        var staticPlaceholder: String? // optional placeholder that does not float/stays in the underlying text field
         var attributedText: NSAttributedString
         var keyboardProperties: KeyboardProperties
         var isOptional: Bool
         var validationState: ValidationState
+        var shouldInsetContent: Bool
     }
     
     var viewModel: ViewModel {
@@ -72,12 +82,13 @@ import UIKit
             }
         }()
         return ViewModel(
-            placeholder: placeholder,
-            text: text,
+            floatingPlaceholder: configuration.placeholderShouldFloat ? placeholder : nil,
+            staticPlaceholder: configuration.placeholderShouldFloat ? nil : placeholder,
             attributedText: configuration.makeDisplayText(for: text),
             keyboardProperties: configuration.keyboardProperties(for: text),
             isOptional: isOptional,
-            validationState: validationState
+            validationState: validationState,
+            shouldInsetContent: shouldInsetContent
         )
     }
 
@@ -86,14 +97,20 @@ import UIKit
     public required init(configuration: TextFieldElementConfiguration) {
         self.configuration = configuration
     }
-    
+
     // MARK: - Helpers
     
     func sanitize(text: String) -> String {
-        return String(
-            text.stp_stringByRemovingCharacters(from: configuration.disallowedCharacters)
-            .prefix(configuration.maxLength)
-        )
+        let sanitizedText = text.stp_stringByRemovingCharacters(from: configuration.disallowedCharacters)
+        return String(sanitizedText.prefix(configuration.maxLength(for: sanitizedText)))
+    }
+
+    func resetText() {
+        text = sanitize(text: "")
+        
+        // Glue: Update the view and our delegate
+        textFieldView.updateUI(with: viewModel)
+        delegate?.didUpdate(element: self)
     }
 }
 
@@ -102,6 +119,18 @@ import UIKit
 extension TextFieldElement: Element {
     public var view: UIView {
         return textFieldView
+    }
+    public var errorText: String? {
+        guard
+            case .invalid(let error) = validationState,
+            error.shouldDisplay(isUserEditing: isEditing)
+        else {
+            return nil
+        }
+        return error.localizedDescription
+    }
+    public var subLabelText: String? {
+        return configuration.subLabel(text: text)
     }
 }
 

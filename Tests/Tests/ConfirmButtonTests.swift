@@ -23,11 +23,9 @@ class ConfirmButtonTests: XCTestCase {
         ]
 
         for (backgroundColor, expectedForeground) in testCases {
-            // `BuyButton` uses appearance proxy for customizing the background color
-            ConfirmButton.BuyButton.appearance().backgroundColor = backgroundColor
-
             let button = ConfirmButton.BuyButton()
-            button.update(status: .enabled, callToAction: .pay(amount: 900, currency: "usd"))
+            button.tintColor = backgroundColor
+            button.update(status: .enabled, callToAction: .pay(amount: 900, currency: "usd"), animated: false)
 
             XCTAssertEqual(
                 // Test against `.cgColor` because any color set as `.backgroundColor`
@@ -42,6 +40,30 @@ class ConfirmButtonTests: XCTestCase {
                 "The foreground color should contrast with the background color"
             )
         }
+    }
+
+    func testUpdateShouldCallTheCompletionBlock() {
+        let sut = ConfirmButton(style: .stripe, callToAction: .pay(amount: 1000, currency: "usd"), didTap: {})
+
+        let expectation = XCTestExpectation(description: "Should call the completion block")
+
+        sut.update(state: .disabled, animated: false) {
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: 1)
+    }
+
+    func testUpdateShouldCallTheCompletionBlockWhenAnimated() {
+        let sut = ConfirmButton(style: .stripe, callToAction: .pay(amount: 1000, currency: "usd"), didTap: {})
+
+        let expectation = XCTestExpectation(description: "Should call the completion block")
+
+        sut.update(state: .disabled, animated: true) {
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: 3)
     }
 
 }

@@ -40,6 +40,9 @@
 /* Title shown above a card entry form */
 "Add a card" = "Kártya hozzáadása";
 
+/* Button prompt to add a bank account as a payment method. */
+"Add bank account" = "Bankszámla hozzáadása";
+
 /* Label of a button displayed below a card entry form that saves the card details */
 "Add card" = "Kártya hozzáadása";
 
@@ -51,6 +54,9 @@
 
 /* Address line 2 placeholder for billing address form. */
 "Address line 2 (optional)" = "Cím 2. sora (nem kötelező)";
+
+/* Payment Method type brand name */
+"Affirm" = "Affirm";
 
 /* Payment Method type brand name  */
 "Afterpay" = "Afterpay";
@@ -91,6 +97,9 @@
 /* Source type brand name */
 "Bancontact" = "Bancontact";
 
+/* Link Instant Debit payment method display name */
+"Bank" = "Bank";
+
 /* Label for Bank Account selection or detail entry form */
 "Bank Account" = "Bankszámla";
 
@@ -105,6 +114,12 @@
 
 /* Klarna buy now or pay later copy */
 "Buy now or pay later with Klarna." = "Megvásárlás most, vagy fizetés később Klarnával.";
+
+/* Mandate text displayed when paying via Link instant debit. */
+"By continuing, you agree to authorize payments pursuant to these <terms>terms</terms>." = "A folytatással elfogadja, hogy engedélyezi a kifizetéseket ezen <terms>feltételek</terms> szerint.";
+
+/* Legal text shown when creating a Link account. */
+"By joining Link, you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>." = "A Linkhez történő csatlakozással Őn elfogadja a <terms>feltételeket</terms> és az </privacy>adatvédelmi szabályzatot<privacy>.";
 
 /* SEPA legal authorization text – must use official translations. */
 "By providing your IBAN and confirming this payment, you are authorizing %@ and Stripe, our payment service provider, to send instructions to your bank to debit your account and your bank to debit your account in accordance with those instructions. You are entitled to a refund from your bank under the terms and conditions of your agreement with your bank. A refund must be claimed within 8 weeks starting from the date on which your account was debited." = "IBAN-száma megadásával és a kifizetés megerősítésével engedélyezi, hogy a(z) %@ és a Stripe, a kifizetési szolgáltatónk utasításokat küldjön bankjának a számlája megterhelése céljából és a bankja megterhelje számláját az utasításoknak megfelelően. Ön visszatérítésre jogosult a bankjától a bankjával fennálló szerződésének feltételei és kikötései szerint. A visszatérítést a számla megterhelésének dátumától számított 8 héten belül igényelni kell.";
@@ -126,9 +141,6 @@
 
 /* Label for entering CVV in text field */
 "CVV" = "CVV";
-
-/* Button title to cancel action in an alert */
-"Cancel" = "Mégse";
 
 /* Title for credit card number entry field */
 "Card" = "Kártya";
@@ -153,9 +165,6 @@
 
 /* Title for contact info form */
 "Contact" = "Kapcsolat";
-
-/* Text for continue button */
-"Continue" = "Folytatás";
 
 /* Title for delivery address entry section */
 "DELIVERY ADDRESS" = "SZÁLLÍTÁSI CÍM";
@@ -200,7 +209,7 @@
 "Klarna" = "Klarna";
 
 /* Link Payment Method type brand name */
-"Link" = "Hivatkozás";
+"Link" = "Link";
 
 /* Title for screen when data is still loading from the network. */
 "Loading…" = "Betöltés...";
@@ -232,9 +241,6 @@
 /* Button to move to the next text entry field */
 "Next" = "Tovább";
 
-/* No comment provided by engineer. */
-"OK" = "OK";
-
 /* Payment Method type brand name */
 "OXXO" = "OXXO";
 
@@ -246,9 +252,6 @@
 
 /* Title of a section containing a card form that will collect the payment information from the user. */
 "Or pay with a card" = "Vagy fizetés kártyával";
-
-/* An option in a dropdown selector indicating the customer's desired selection is not in the list. e.g., 'Choose your bank: Bank1, Bank2, Other' */
-"Other" = "Egyéb";
 
 /* Source type brand name */
 "P24" = "P24";
@@ -267,9 +270,6 @@
 
 /* Title for Payment Method screen */
 "Payment Method" = "Fizetési mód";
-
-/* Caption for Phone field on address form */
-"Phone" = "Telefon";
 
 /* Accessibility instructions for card scanning. */
 "Point the camera at your card." = "Tegye a kártyát a kamera elé.";
@@ -332,9 +332,6 @@
 /* The label of a switch indicating whether to save the user's card for future payment */
 
 "Save this card for future Stripe payments" = "Kártya mentése a jöbőbeni Stripe fizetésekhez";
-/* Label of a button displayed below a payment method form. Tapping the button closes the form and uses the entered payment method details for checkout in the next step */
-
-"Select" = "Kiválasztás";
 /* label for iDEAL-bank selection picker */
 
 "Select bank" = "Bankválasztás";

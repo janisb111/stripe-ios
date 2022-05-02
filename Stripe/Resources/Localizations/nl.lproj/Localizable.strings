@@ -40,6 +40,9 @@
 /* Title shown above a card entry form */
 "Add a card" = "Een kaart toevoegen";
 
+/* Button prompt to add a bank account as a payment method. */
+"Add bank account" = "Bankrekening toevoegen";
+
 /* Label of a button displayed below a card entry form that saves the card details */
 "Add card" = "Kaart toevoegen";
 
@@ -51,6 +54,9 @@
 
 /* Address line 2 placeholder for billing address form. */
 "Address line 2 (optional)" = "Adresregel 2 (optioneel)";
+
+/* Payment Method type brand name */
+"Affirm" = "Affirm";
 
 /* Payment Method type brand name  */
 "Afterpay" = "Afterpay";
@@ -91,6 +97,9 @@
 /* Source type brand name */
 "Bancontact" = "Bancontact";
 
+/* Link Instant Debit payment method display name */
+"Bank" = "Bank";
+
 /* Label for Bank Account selection or detail entry form */
 "Bank Account" = "Bankrekening";
 
@@ -105,6 +114,12 @@
 
 /* Klarna buy now or pay later copy */
 "Buy now or pay later with Klarna." = "Koop nu of betaal later met Klarna.";
+
+/* Mandate text displayed when paying via Link instant debit. */
+"By continuing, you agree to authorize payments pursuant to these <terms>terms</terms>." = "Als je doorgaat, stem je in dat betalingen worden geautoriseerd in overeenstemming met deze <terms>voorwaarden</terms>.";
+
+/* Legal text shown when creating a Link account. */
+"By joining Link, you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>." = "Door Link te gebruiken ga je akkoord met de <terms>voorwaarden</terms> en het <privacy>privacybeleid</privacy>.";
 
 /* SEPA legal authorization text – must use official translations. */
 "By providing your IBAN and confirming this payment, you are authorizing %@ and Stripe, our payment service provider, to send instructions to your bank to debit your account and your bank to debit your account in accordance with those instructions. You are entitled to a refund from your bank under the terms and conditions of your agreement with your bank. A refund must be claimed within 8 weeks starting from the date on which your account was debited." = "Door je IBAN op te geven en deze betaling te bevestigen, geef je toestemming aan %@ en Stripe, onze betalingsdienstaanbieder, een opdracht te sturen naar je bank om een bedrag van je rekening te debiteren en je bank om een bedrag van je rekening te debiteren overeenkomstig de opdracht. Je kunt je laten terugbetalen door je bank. Vraag je eigen bank naar de voorwaarden. Een verzoek tot terugbetaling moet binnen 8 weken na de datum van debitering van het bedrag van je rekening worden ingediend.";
@@ -126,9 +141,6 @@
 
 /* Label for entering CVV in text field */
 "CVV" = "Cvv";
-
-/* Button title to cancel action in an alert */
-"Cancel" = "Annuleren";
 
 /* Title for credit card number entry field */
 "Card" = "Kaart";
@@ -153,9 +165,6 @@
 
 /* Title for contact info form */
 "Contact" = "Contact";
-
-/* Text for continue button */
-"Continue" = "Doorgaan";
 
 /* Title for delivery address entry section */
 "DELIVERY ADDRESS" = "BEZORGADRES";
@@ -232,9 +241,6 @@
 /* Button to move to the next text entry field */
 "Next" = "Volgende";
 
-/* No comment provided by engineer. */
-"OK" = "OK";
-
 /* Payment Method type brand name */
 "OXXO" = "OXXO";
 
@@ -246,9 +252,6 @@
 
 /* Title of a section containing a card form that will collect the payment information from the user. */
 "Or pay with a card" = "Of met een kaart betalen";
-
-/* An option in a dropdown selector indicating the customer's desired selection is not in the list. e.g., 'Choose your bank: Bank1, Bank2, Other' */
-"Other" = "Overige";
 
 /* Source type brand name */
 "P24" = "P24";
@@ -267,9 +270,6 @@
 
 /* Title for Payment Method screen */
 "Payment Method" = "Betaalmethode";
-
-/* Caption for Phone field on address form */
-"Phone" = "Telefoon";
 
 /* Accessibility instructions for card scanning. */
 "Point the camera at your card." = "Richt de camera op de kaart.";
@@ -332,9 +332,6 @@
 /* The label of a switch indicating whether to save the user's card for future payment */
 
 "Save this card for future Stripe payments" = "Deze betaalkaart opslaan voor toekomstige Stripe-betalingen";
-/* Label of a button displayed below a payment method form. Tapping the button closes the form and uses the entered payment method details for checkout in the next step */
-
-"Select" = "Selecteren";
 /* label for iDEAL-bank selection picker */
 
 "Select bank" = "Bank selecteren";

@@ -10,6 +10,7 @@ import Foundation
 import PassKit
 import SafariServices
 @_spi(STP) import StripeCore
+@_spi(STP) import StripeApplePay
 
 #if canImport(Stripe3DS2)
     import Stripe3DS2
@@ -34,7 +35,7 @@ import SafariServices
     /// Indicates that the action requires an authentication app, but either the app is not installed or the request to switch to the app was denied.
     @objc(STPPaymentHandlerRequiredAppNotAvailableErrorCode)
     case requiredAppNotAvailable
-    
+
     /// Attach a payment method to the PaymentIntent or SetupIntent before using `STPPaymentHandler`.
     @objc(STPPaymentHandlerRequiresPaymentMethodErrorCode)
     case requiresPaymentMethodErrorCode
@@ -86,8 +87,6 @@ public typealias STPPaymentHandlerActionSetupIntentCompletionBlock = (
 /// `STPPaymentHandler` is a utility class that confirms PaymentIntents/SetupIntents and handles any authentication required, such as 3DS1/3DS2 for Strong Customer Authentication.
 /// It can present authentication UI on top of your app or redirect users out of your app (to e.g. their banking app).
 /// - seealso: https://stripe.com/docs/mobile/ios/authentication
-@available(iOSApplicationExtension, unavailable)
-@available(macCatalystApplicationExtension, unavailable)
 public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
 
     /// The error domain for errors in `STPPaymentHandler`.
@@ -166,6 +165,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
     ///   - paymentParams: The params used to confirm the PaymentIntent. Note that this method overrides the value of `paymentParams.useStripeSDK` to `@YES`.
     ///   - authenticationContext: The authentication context used to authenticate the payment.
     ///   - completion: The completion block. If the status returned is `STPPaymentHandlerActionStatusSucceeded`, the PaymentIntent status is not necessarily STPPaymentIntentStatusSucceeded (e.g. some bank payment methods take days before the PaymentIntent succeeds).
+    @available(iOSApplicationExtension, unavailable)
+    @available(macCatalystApplicationExtension, unavailable)
     @objc(confirmPayment:withAuthenticationContext:completion:)
     public func confirmPayment(
         _ paymentParams: STPPaymentIntentParams,
@@ -197,7 +198,7 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
                         && STPPaymentHandler._isProcessingIntentSuccess(
                             for: paymentIntent.paymentMethod?.type ?? .unknown)
                         || (paymentIntent.status == .requiresAction
-                            && strongSelf._isPaymentIntentNextActionVoucherBased(
+                            && strongSelf.isNextActionSuccessState(
                                 nextAction: paymentIntent.nextAction)))
 
                 if error == nil && successIntentState {
@@ -249,6 +250,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
         *, deprecated, message: "Use confirmPayment(_:with:completion:) instead",
         renamed: "confirmPayment(_:with:completion:)"
     )
+    @available(iOSApplicationExtension, unavailable)
+    @available(macCatalystApplicationExtension, unavailable)
     public func confirmPayment(
         withParams: STPPaymentIntentParams,
         authenticationContext: STPAuthenticationContext,
@@ -265,6 +268,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
     ///   - returnURL: An optional URL to redirect your customer back to after they authenticate or cancel in a webview. This should match the returnURL you specified during PaymentIntent confirmation.
     ///   - completion: The completion block. If the status returned is `STPPaymentHandlerActionStatusSucceeded`, the PaymentIntent status will always be either STPPaymentIntentStatusSucceeded, or STPPaymentIntentStatusRequiresConfirmation, or STPPaymentIntentStatusRequiresCapture if you are using manual capture. In the latter two cases, confirm or capture the PaymentIntent on your backend to complete the payment.
     @objc(handleNextActionForPayment:withAuthenticationContext:returnURL:completion:)
+    @available(iOSApplicationExtension, unavailable)
+    @available(macCatalystApplicationExtension, unavailable)
     public func handleNextAction(
         forPayment paymentIntentClientSecret: String,
         with authenticationContext: STPAuthenticationContext,
@@ -355,6 +360,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
     ///   - setupIntentConfirmParams: The params used to confirm the SetupIntent. Note that this method overrides the value of `setupIntentConfirmParams.useStripeSDK` to `@YES`.
     ///   - authenticationContext: The authentication context used to authenticate the SetupIntent.
     ///   - completion: The completion block. If the status returned is `STPPaymentHandlerActionStatusSucceeded`, the SetupIntent status will always be STPSetupIntentStatusSucceeded.
+    @available(iOSApplicationExtension, unavailable)
+    @available(macCatalystApplicationExtension, unavailable)
     @objc(confirmSetupIntent:withAuthenticationContext:completion:)
     public func confirmSetupIntent(
         _ setupIntentConfirmParams: STPSetupIntentConfirmParams,
@@ -387,7 +394,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
                 // Ensure the .succeeded case returns a PaymentIntent in the expected state.
                 if let setupIntent = setupIntent,
                     error == nil,
-                    setupIntent.status == .succeeded
+                   (setupIntent.status == .succeeded ||
+                (setupIntent.status == .requiresAction && self.isNextActionSuccessState(nextAction: setupIntent.nextAction)))
                 {
                     completion(.succeeded, setupIntent, nil)
                 } else {
@@ -449,6 +457,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
     ///   - returnURL: An optional URL to redirect your customer back to after they authenticate or cancel in a webview. This should match the returnURL you specified during SetupIntent confirmation.
     ///   - completion: The completion block. If the status returned is `STPPaymentHandlerActionStatusSucceeded`, the SetupIntent status will always be  STPSetupIntentStatusSucceeded.
     @objc(handleNextActionForSetupIntent:withAuthenticationContext:returnURL:completion:)
+    @available(iOSApplicationExtension, unavailable)
+    @available(macCatalystApplicationExtension, unavailable)
     public func handleNextAction(
         forSetupIntent setupIntentClientSecret: String,
         with authenticationContext: STPAuthenticationContext,
@@ -541,7 +551,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
         case .SEPADebit,
             .bacsDebit /* Bacs Debit takes 2-3 business days */,
             .AUBECSDebit,
-            .sofort:
+            .sofort,
+            .USBankAccount:
             return true
 
         /* Synchronous */
@@ -563,7 +574,10 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
             .blik,
             .weChatPay,
             .boleto,
-            .klarna:
+            .link,
+            .klarna,
+            .affirm,
+            .linkInstantDebit:
             return false
 
         case .unknown:
@@ -574,6 +588,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
         }
     }
 
+    @available(iOSApplicationExtension, unavailable)
+    @available(macCatalystApplicationExtension, unavailable)
     func _handleNextAction(
         forPayment paymentIntent: STPPaymentIntent,
         with authenticationContext: STPAuthenticationContext,
@@ -608,6 +624,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
         }
     }
 
+    @available(iOSApplicationExtension, unavailable)
+    @available(macCatalystApplicationExtension, unavailable)
     func _handleNextAction(
         for setupIntent: STPSetupIntent,
         with authenticationContext: STPAuthenticationContext,
@@ -793,6 +811,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
         return false
     }
 
+    @available(iOSApplicationExtension, unavailable)
+    @available(macCatalystApplicationExtension, unavailable)
     func _handleAuthenticationForCurrentAction() {
         guard let currentAction = currentAction,
             let authenticationAction = currentAction.nextAction()
@@ -985,7 +1005,7 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
 
                                                         if let paymentSheet =
                                                             presentingViewController
-                                                            as? BottomSheetViewController
+                                                            as? PaymentSheetAuthenticationContext
                                                         {
                                                             transaction.doChallenge(
                                                                 with: challengeParameters,
@@ -1119,6 +1139,11 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
                 fatalError()
             }
             currentAction.complete(with: .succeeded, error: nil)
+            
+        case .verifyWithMicrodeposits:
+            // The customer must authorize after the microdeposits appear in their bank account
+            // which may take 1-2 business days
+            currentAction.complete(with: .succeeded, error: nil)
 
         @unknown default:
             fatalError()
@@ -1171,8 +1196,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
                                 forAction: currentAction)
                             if requiresAction {
                                 // If the status is still RequiresAction, the user exited from the redirect before the
-                                // payment intent was updated. Consider it a cancel, unless it's a voucher method.
-                                if self._isPaymentIntentNextActionVoucherBased(nextAction: paymentIntent.nextAction) {
+                                // payment intent was updated. Consider it a cancel, unless it's a valid terminal next action
+                                if self.isNextActionSuccessState(nextAction: paymentIntent.nextAction) {
                                     currentAction.complete(with: .succeeded, error: nil)
                                 } else {
                                     self._markChallengeCanceled(withCompletion: { _, _ in
@@ -1203,12 +1228,18 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
 
                     if requiresAction {
                         // If the status is still RequiresAction, the user exited from the redirect before the
-                        // setup intent was updated. Consider it a cancel
-                        self._markChallengeCanceled(withCompletion: { _, _ in
-                            // We don't forward cancelation errors
-                            currentAction.complete(
-                                with: STPPaymentHandlerActionStatus.canceled, error: nil)
-                        })
+                        // payment intent was updated. Consider it a cancel, unless it's a valid terminal next action
+                        if self.isNextActionSuccessState(nextAction: setupIntent.nextAction) {
+                            currentAction.complete(with: .succeeded, error: nil)
+                        } else {
+                            // If the status is still RequiresAction, the user exited from the redirect before the
+                            // setup intent was updated. Consider it a cancel
+                            self._markChallengeCanceled(withCompletion: { _, _ in
+                                // We don't forward cancelation errors
+                                currentAction.complete(
+                                    with: STPPaymentHandlerActionStatus.canceled, error: nil)
+                            })
+                        }
                     }
                 }
 
@@ -1224,6 +1255,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
         _retrieveAndCheckIntentForCurrentAction()
     }
 
+    @available(iOSApplicationExtension, unavailable)
+    @available(macCatalystApplicationExtension, unavailable)
     func _handleRedirect(to url: URL, withReturn returnURL: URL?) {
         _handleRedirect(to: url, fallbackURL: url, return: returnURL)
     }
@@ -1231,6 +1264,8 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
     /// This method:
     /// 1. Redirects to an app using url
     /// 2. Open fallbackURL in a webview if 1) fails
+    @available(iOSApplicationExtension, unavailable)
+    @available(macCatalystApplicationExtension, unavailable)///
     func _handleRedirect(to nativeURL: URL?, fallbackURL: URL?, return returnURL: URL?) {
         var url = nativeURL
         guard let currentAction = currentAction else {
@@ -1371,13 +1406,24 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
         }
         return canPresent
     }
-
-    /// Check paymentIntent.nextAction is voucher-based payment method.
-    /// Currently only OXXO payment is voucher-based.
-    /// If it's voucher-based, the paymentIntent status stays in requiresAction until the voucher is paid or expired.
-    func _isPaymentIntentNextActionVoucherBased(nextAction: STPIntentAction?) -> Bool {
+    
+    /// Check if the intent.nextAction is expected state after a successful on-session transaction
+    /// e.g. for voucher-based payment methods like OXXO that require out-of-band payment
+    func isNextActionSuccessState(nextAction: STPIntentAction?) -> Bool {
         if let nextAction = nextAction {
-            return nextAction.type == .OXXODisplayDetails || nextAction.type == .boletoDisplayDetails
+            switch nextAction.type {
+            case .unknown,
+                    .redirectToURL,
+                    .useStripeSDK,
+                    .alipayHandleRedirect,
+                    .BLIKAuthorize,
+                    .weChatPayRedirectToApp:
+                return false
+            case .OXXODisplayDetails,
+                    .boletoDisplayDetails,
+                    .verifyWithMicrodeposits:
+                return true
+            }
         }
         return false
     }
@@ -1414,7 +1460,7 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
         case .useStripeSDK:
             threeDSSourceID = nextAction.useStripeSDK?.threeDSSourceID
         case .OXXODisplayDetails, .alipayHandleRedirect, .unknown, .BLIKAuthorize,
-             .weChatPayRedirectToApp, .boletoDisplayDetails:
+                .weChatPayRedirectToApp, .boletoDisplayDetails, .verifyWithMicrodeposits:
             break
         @unknown default:
             fatalError()
@@ -1616,8 +1662,6 @@ public class STPPaymentHandler: NSObject, SFSafariViewControllerDelegate {
     }
 }
 
-@available(iOSApplicationExtension, unavailable)
-@available(macCatalystApplicationExtension, unavailable)
 extension STPPaymentHandler {
     // MARK: - STPChallengeStatusReceiver
     /// :nodoc:
@@ -1795,7 +1839,7 @@ extension STPPaymentHandler {
             return
         }
         if let paymentSheet = currentAction.authenticationContext
-            .authenticationPresentingViewController() as? BottomSheetViewController
+            .authenticationPresentingViewController() as? PaymentSheetAuthenticationContext
         {
             paymentSheet.dismiss(challengeViewController)
         } else {
